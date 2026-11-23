@@ -34,23 +34,9 @@
 | `src/Common/Il2CppInspector.Common/Outputs` | DummyDll、C#、C++、JSON、脚本、PDB、DWARF 输出。 |
 | `src/Common/Il2CppInspector.Common/Plugins` | 插件契约：`GamePlugin`、`GameMetadataAdapter`、`GameNativeModel` 等。 |
 | `src/Plugins/<GameId>` | 单个游戏版本的插件。 |
-| `src/Plugins/Shared/<family>` | 多个游戏共用的插件源码（如 MORAX：BH3、Genshin、HSR、ZZZ），由各插件项目通过 `.props` 编入。 |
+| `src/Plugins/Shared/<family>` | 多个游戏共用的插件源码，由各插件项目通过 `.props` 编入。 |
 | `tests/Il2CppInspector.Tests` | 集成测试控制台程序。 |
 | `src/Common/Bin2Object`、`src/Common/VersionedSerialization*` | 二进制对象读写与版本化序列化。 |
-
-| 游戏 | GameId |
-| --- | --- |
-| Arknights | `Arknights_CN_Windows_2.7.91` |
-| Cygames | `Cy_JP_Windows_x.x.x` |
-| BH3 | `BH3_CN_Windows_9.1.0` |
-| Genshin | `Genshin_CN_Windows_7.1.0`、`Genshin_CN_Windows_7.2.0` |
-| HSR | `HSR_OS_Windows_4.6.0`、`HSR_CN_Windows_4.6.51` |
-| ZZZ | `ZZZ_CN_Windows_3.2.0`、`ZZZ_CN_Windows_3.3.0` |
-| Endfield | `Endfield_CN_Android_x.x.x`、`Endfield_CN_Windows_1.6.3` |
-| TOT | `TOT_CN_Android_6.1.0`、`TOT_OS_Android_5.8.1` |
-| 恋与深空 | `LAD_CN_Android_6.0.0` |
-| Limbus Company | `LimbusCompany_OS_Windows_1.119.1` |
-| 逆水寒 | `NSH_OS_Windows_20260731072817UTC` |
 
 ## 3. 模块规范
 
@@ -63,7 +49,7 @@
 
 - 只负责命令行解析、插件发现与匹配、阶段进度显示和输出目标调度，不放元数据解码或模型分析逻辑。
 - 自动识别插件有歧义（多个插件同时匹配）时列出候选并要求显式传入 `--game <GameId>`；显式指定 `--game` 但无匹配或文件不匹配时直接报错退出。
-- 输出目录布局：`DummyDll/`；每个脚本目标一个 `Script_<target>/`（`il2cpp.py`、`il2cpp.json`，未选 Debug 时还有 `il2cpp.h`），头文件与 JSON 只生成一次，其余目标目录复制；Debug 在根目录写 `<binary>.pdb` 或嵌入 DWARF 的二进制。未选目标的流式导出插件（MORAX）仍在根目录写 `il2cpp.h` 与 `il2cpp.json`。
+- 输出目录布局：`DummyDll/`；每个脚本目标一个 `Script_<target>/`（`il2cpp.py`、`il2cpp.json`，未选 Debug 时还有 `il2cpp.h`），头文件与 JSON 只生成一次，其余目标目录复制；Debug 在根目录写 `<binary>.pdb` 或嵌入 DWARF 的二进制。未选目标的流式导出插件仍在根目录写 `il2cpp.h` 与 `il2cpp.json`。
 - `-t IDA` 在 `Script_IDA/` 中同时输出 GUI 版 `il2cpp.py` 和 idat 终端版 `il2cpp_t.py`。终端版依赖 tqdm，支持双行进度、按 q 保存退出，以及通过脚本旁的 `.progress.json` 恢复匹配数据库中的顺序进度。
 - `--json-progress` 把 `ProgressBar` 的进度与状态改为每行一个 JSON 对象（`{"event":"progress",label,current,total,detail}` / `{"event":"status",message}`），`--list-games` 每行输出一个已安装的 `GameId`，与 `--json-progress` 同用时每行输出 `{gameId,inputs:{binary,metadata,startupMetadata}}`，供 GUI 获取插件输入需求；修改时同步更新 `src/GUI/src/cli.rs`。
 
@@ -78,16 +64,16 @@
 
 - `GameId` 格式为 `NAME_REGION_PLATFORM_VERSION`，与插件目录名完全一致；版本可以是数字版本号或构建时间戳，`x.x.x` 表示支持多个游戏版本。
 - 插件实现公开、无参构造的 `GamePlugin` 子类。`Matches` 必须能区分同一游戏的不同版本。
-- `GamePlugin.RequiredInputs` 使用 `GamePluginInputs` 声明所需文件；默认需要 Binary 和 Metadata，Cy 只需要 Binary，MORAX 另外需要 StartupMetadata。加载入口在读取文件前忽略未声明的输入；StartupMetadata 可按 `StartupMetadataFileName` 从元数据旁自动查找。
+- `GamePlugin.RequiredInputs` 使用 `GamePluginInputs` 声明所需文件；默认需要 Binary 和 Metadata，嵌入式元数据插件只需要 Binary，另有启动元数据的插件可追加 StartupMetadata。加载入口在读取文件前忽略未声明的输入；StartupMetadata 可按 `StartupMetadataFileName` 从元数据旁自动查找。
 - 插件只负责解码、规范化记录和经二进制验证的运行时布局差异；反射模型、声明生成、依赖排序和所有导出复用 Common，不另写 DLL、头文件或 JSON 输出器。
 - 加密或重排的记录先规范化为 stock 记录：仅需规范化元数据、后续走 stock 管线的插件直接构造 `Metadata`；需要自定义运行时布局的插件通过 `Metadata.CreateForPlugin` 挂接 `GameMetadataAdapter`。
 - 运行时布局：只提供不同于 stock 的布局钩子；`NativeLayoutAnalysisModel` 负责方法遍历与声明命名。字段宽度、缓存记录或 vtable 表示的改动须有二进制证据，并在注释中写明逆向地址。
-- 导出命名沿用 stock 规则：保留元数据中的类型、方法和字段名，不加游戏前缀（如 `Zzz_`）。
-- 同一引擎分支的多个游戏（如 MORAX）共用 `src/Plugins/Shared/<family>/` 下的基类与辅助代码，项目通过 `<Import Project="../Shared/<family>/<family>.props" />` 编入；游戏目录只放密钥、偏移、记录读取器和确有差异的布局。
+- 导出命名沿用 stock 规则：保留元数据中的类型、方法和字段名，不加游戏前缀。
+- 同一引擎分支的多个游戏共用 `src/Plugins/Shared/<family>/` 下的基类与辅助代码，项目通过 `<Import Project="../Shared/<family>/<family>.props" />` 编入；游戏目录只放密钥、偏移、记录读取器和确有差异的布局。
 - 插件目录统一为：`<Game>Plugin.cs`、`<Game>Build.cs`（版本常量，可选）、`IL2CPP/`（适配器、二进制、默认值、运行时头）、`Model/`、`Next/Metadata/<Game>Records.cs`、`Reflection/`，不再按游戏名嵌套子目录。
-- 同一游戏的多个版本共享相同源码时，用 `<Compile Include="../<GameId>/..." Link="..." />` 链接，不复制文件（参考 `Genshin_CN_Windows_7.2.0`、`TOT_OS_Android_5.8.1`、`ZZZ_CN_Windows_3.3.0`）；某版本需要不同实现时，再把该文件复制到本版本目录并去掉链接。
-- 嵌入资源的 `LogicalName` 固定为 `Il2CppInspector.Plugin.<game>.<文件名>`；共享资源沿用源版本或共享族的 `LogicalName`（如 `Il2CppInspector.Plugin.Morax.RuntimeCaches.py`）。
-- 每个插件在 `src/Plugins/README.md` 的支持表中登记，并在 `tests/Il2CppInspector.Tests/Plugin/GameSampleTests.cs` 的 `Samples` 表中加一行（二进制文件名和基线）。
+- 同一游戏的多个版本共享相同源码时，用 `<Compile Include="../<GameId>/..." Link="..." />` 链接，不复制文件；某版本需要不同实现时，再把该文件复制到本版本目录并去掉链接。
+- 嵌入资源的 `LogicalName` 固定为 `Il2CppInspector.Plugin.<game>.<文件名>`；共享资源沿用源版本或共享族的 `LogicalName`（如 `Il2CppInspector.Plugin.<family>.<文件名>`）。
+- 每个插件在 `tests/Il2CppInspector.Tests/Plugin/GameSampleTests.cs` 的 `Samples` 表中加一行（二进制文件名和基线）。
 
 ### 3.4 `tests/Il2CppInspector.Tests`
 
@@ -222,10 +208,10 @@ dotnet run --project tests/Il2CppInspector.Tests -c Release --no-build -- --game
 
 - 保留工作树中已有的未提交改动：不执行 `git checkout`/`restore`/`reset --hard`/`stash`/`clean` 等会丢弃改动的命令；除非明确要求，不要提交。
 - 不提交 `artifacts/`、`bin/`、`obj/`、`output/` 和 `target/` 等生成内容；`src/GUI/Cargo.lock` 需要提交。
-- 支持的游戏、`GameId` 或 CLI 选项变化时，同步更新本文件第 2 节、`src/Plugins/README.md` 和 CLI 帮助文本。
+- 支持的游戏、`GameId` 或 CLI 选项变化时，同步更新 `tests/Il2CppInspector.Tests/Plugin/GameSampleTests.cs` 的 `Samples` 表和 CLI 帮助文本。
 - 提交信息使用 Conventional Commits 格式：`type(scope): summary`。
   - `type` 取 `feat`、`fix`、`refactor`、`perf`、`test`、`docs`、`chore`；
-  - `scope` 用模块（`outputs`、`cli`、`plugins`）或游戏代号（`zzz`、`tot`、`genshin`）；
+  - `scope` 用模块（如 `outputs`、`cli`、`plugins`）或游戏代号（小写）；
   - `summary` 用英文祈使句，小写开头。
 - 格式化、重构与行为变更分开提交。
 - 交付时说明变更内容、验证结果（构建、测试计数）以及未完成的检查。
