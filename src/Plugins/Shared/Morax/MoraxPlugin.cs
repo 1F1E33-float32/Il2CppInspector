@@ -37,9 +37,12 @@ public abstract class MoraxPlugin : GamePlugin
 
     public override UnityHeaders GetHeaders() => UnityHeaders.ForPlugin(new("2019.4.24"), DefaultUnityVersion, ApplyRuntimeRecords);
 
-    private string ApplyRuntimeRecords(string stock)
+    private string ApplyRuntimeRecords(string stock) =>
+        $"// {GameId} MORAX runtime layout. Encoded runtime members require decoding.\n" + ApplyRuntimeRecords(stock, RuntimeRecords);
+
+    internal static string ApplyRuntimeRecords(string stock, IEnumerable<(string Name, string Body)> records)
     {
-        foreach (var (name, body) in RuntimeRecords)
+        foreach (var (name, body) in records)
         {
             var pattern = $@"typedef struct (?:__attribute__\(\(aligned\([0-9]+\)\)\)\s+)?{name}\s*\{{.*?\}}\s*{name};";
             if (!Regex.IsMatch(stock, pattern, RegexOptions.Singleline))
@@ -49,7 +52,7 @@ public abstract class MoraxPlugin : GamePlugin
                 body == null ? $"typedef struct {name} {name};" : $"typedef struct {name}\n{{\n{body.ReplaceLineEndings("\n")}\n}} {name};";
             stock = Regex.Replace(stock, pattern, _ => replacement, RegexOptions.Singleline);
         }
-        return $"// {GameId} MORAX runtime layout. Encoded runtime members require decoding.\n" + stock;
+        return stock;
     }
 
     public override IGameTypeLayouts CreateTypeLayouts(TypeModel model)
