@@ -407,6 +407,7 @@ Options:
       --game <id>           Game plugin: NAME_REGION_PLATFORM_VERSION
                             e.g. Endfield_CN_Android_x.x.x, NSH_OS_Windows_20260731072817UTC
                             LimbusCompany_OS_Windows_1.119.1 accepts encrypted metadata
+                            ABC_CN_Windows_0.75.2 accepts MHY v1 metadata
                             Auto-detect when omitted
       --unity-version <v>   Unity version override (e.g. 2021.3.0f1)
       --image-base <hex>    Image base address for ELF memory dumps (hex)

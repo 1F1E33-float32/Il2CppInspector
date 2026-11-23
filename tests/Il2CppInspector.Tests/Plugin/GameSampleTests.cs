@@ -9,6 +9,10 @@ internal static class GameSampleTests
     // permutation or layout hook changes at least one value. A null baseline prints the measured values.
     private static readonly Dictionary<string, (string Binary, string Baseline)> Samples = new(StringComparer.OrdinalIgnoreCase)
     {
+        ["ABC_CN_Windows_0.75.2"] = (
+            "GameAssembly.dll",
+            "types=30988 methods=221780 fields=147223 params=188602 literals=33254 typeRefs=116105 methodSpecs=279786 usages=135812 attributes=0 Il2CppClass=0x138 Il2CppClass.static_fields=0xD0 Il2CppClass.vtable_count=0x10A MethodInfo=0x40 MethodInfo.flags=0x32 Il2CppCodeRegistration=0x1 Il2CppMetadataRegistration=0x1"
+        ),
         ["Arknights_CN_Windows_2.7.91"] = (
             "GameAssembly.dll",
             "types=51811 methods=326501 fields=380278 params=285223 literals=38145 typeRefs=133233 methodSpecs=310291 usages=200130 attributes=0 Il2CppClass=0x338 Il2CppClass.static_fields=0xB8 Il2CppClass.vtable_count=0x126 MethodInfo=0x58 MethodInfo.flags=0x4C Il2CppCodeRegistration=0x78 Il2CppMetadataRegistration=0x80"

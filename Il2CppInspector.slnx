@@ -27,6 +27,9 @@
     <File Path="src/GUI/rustfmt.toml" />
   </Folder>
   <Folder Name="/src/Plugins/" />
+  <Folder Name="/src/Plugins/ABC/">
+    <Project Path="src/Plugins/ABC_CN_Windows_0.75.2/Il2CppInspector.Plugin.ABC_CN_Windows_0.75.2.csproj" />
+  </Folder>
   <Folder Name="/src/Plugins/Shared/">
     <File Path="src/Plugins/Shared/Morax/Morax.props" />
   </Folder>
