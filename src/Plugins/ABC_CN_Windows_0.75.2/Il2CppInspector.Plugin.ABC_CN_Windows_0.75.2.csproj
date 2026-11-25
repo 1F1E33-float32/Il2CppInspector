@@ -4,7 +4,11 @@
     <RootNamespace>Il2CppInspector.Plugin.ABC</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
+    <PackageReference Include="System.IO.Hashing" Version="9.0.7" />
     <ProjectReference Include="../../Common/Il2CppInspector.Common/Il2CppInspector.Common.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="IL2CPP/EngineNames.txt" LogicalName="Il2CppInspector.Plugin.ABC.EngineNames.txt" />
   </ItemGroup>
   <Import Project="../Shared/Morax/Morax.props" />
 </Project>
