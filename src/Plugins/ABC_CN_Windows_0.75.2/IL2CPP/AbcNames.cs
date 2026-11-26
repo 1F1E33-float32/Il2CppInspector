@@ -21,6 +21,8 @@ internal static class AbcNames
         Dictionary<ulong, string> names = [];
         while (reader.ReadLine() is { } name)
         {
+            if (name.StartsWith(';'))
+                continue;
             if (name.Length == 0)
             {
                 throw new InvalidDataException("ABC engine name resource contains an empty entry.");
