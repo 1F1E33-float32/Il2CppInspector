@@ -7,6 +7,7 @@ internal static class PdbOutputTests
 {
     internal static void Run(string directory, string llvmPdbUtil = null, string idat = null)
     {
+        VerifyCodeViewLocations();
         Directory.CreateDirectory(directory);
         var scalar = new CppType("float", 32);
         var vector = new CppComplexType(ComplexValueType.Struct) { Name = "Vector3" };
@@ -115,6 +116,83 @@ internal static class PdbOutputTests
     }
 
     private static uint U32(byte[] bytes, int offset) => BinaryPrimitives.ReadUInt32LittleEndian(bytes.AsSpan(offset));
+
+    private static void VerifyCodeViewLocations()
+    {
+        var guid = new Guid("19d0e96d-709b-4e36-8208-d9d0fb7fcf9b");
+        const uint age = 7;
+        var path = "GameAssembly.pdb\0"u8.ToArray();
+        using var fixture = IL2CPP.RuntimeMetadataTests.CreateBinary(64);
+        var original = fixture.ToArray();
+        // The debug directory is at RVA 0x1200 / file offset 0x400; its RSDS data is at RVA 0x1400 / file offset 0x600.
+        BinaryPrimitives.WriteUInt32LittleEndian(original.AsSpan(0x98 + 112 + 6 * 8), 0x1200);
+        BinaryPrimitives.WriteUInt32LittleEndian(original.AsSpan(0x98 + 112 + 6 * 8 + 4), 28);
+        BinaryPrimitives.WriteUInt32LittleEndian(original.AsSpan(0x400 + 12), 2);
+        BinaryPrimitives.WriteUInt32LittleEndian(original.AsSpan(0x400 + 16), (uint)(24 + path.Length));
+        BinaryPrimitives.WriteUInt32LittleEndian(original.AsSpan(0x400 + 20), 0x1400);
+        "RSDS"u8.CopyTo(original.AsSpan(0x600));
+        guid.TryWriteBytes(original.AsSpan(0x604, 16));
+        BinaryPrimitives.WriteUInt32LittleEndian(original.AsSpan(0x614), age);
+        path.CopyTo(original.AsSpan(0x618));
+
+        foreach (var pointer in new uint[] { 0x600, 0x700, 0x2000 })
+        {
+            var data = original.ToArray();
+            BinaryPrimitives.WriteUInt32LittleEndian(data.AsSpan(0x400 + 24), pointer);
+            // A valid file pointer must remain authoritative, even when the RVA is unavailable.
+            if (pointer == 0x600)
+                BinaryPrimitives.WriteUInt32LittleEndian(data.AsSpan(0x400 + 20), 0x4000);
+            using var input = new MemoryStream(data);
+            using var image = PEReader.Load(input);
+            image.Position = 0;
+            using var reader = new System.Reflection.PortableExecutable.PEReader(
+                image,
+                System.Reflection.PortableExecutable.PEStreamOptions.LeaveOpen
+            );
+            var entry = reader.ReadDebugDirectory().Single();
+            var identity = PdbOutput.ReadCodeViewData(reader, image, entry);
+            Check(
+                identity.Guid == guid && identity.Age == age && identity.Path == "GameAssembly.pdb" && image.ToArray().SequenceEqual(data),
+                $"CodeView file pointer 0x{pointer:X}: export preserves GUID, age and path without changing the PE"
+            );
+        }
+
+        foreach (var fault in new[] { "unmapped RVA", "section boundary", "truncated identity", "invalid signature", "unterminated path" })
+        {
+            var data = original.ToArray();
+            BinaryPrimitives.WriteUInt32LittleEndian(data.AsSpan(0x400 + 24), 0x700);
+            switch (fault)
+            {
+                case "unmapped RVA":
+                    BinaryPrimitives.WriteUInt32LittleEndian(data.AsSpan(0x400 + 20), 0x4000);
+                    break;
+                case "section boundary":
+                    BinaryPrimitives.WriteUInt32LittleEndian(data.AsSpan(0x400 + 20), 0x2DF0);
+                    break;
+                case "truncated identity":
+                    BinaryPrimitives.WriteUInt32LittleEndian(data.AsSpan(0x400 + 16), 20);
+                    break;
+                case "invalid signature":
+                    data[0x600] = 0;
+                    break;
+                case "unterminated path":
+                    data[0x618 + path.Length - 1] = (byte)'x';
+                    break;
+            }
+            using var input = new MemoryStream(data);
+            using var image = PEReader.Load(input);
+            image.Position = 0;
+            using var reader = new System.Reflection.PortableExecutable.PEReader(
+                image,
+                System.Reflection.PortableExecutable.PEStreamOptions.LeaveOpen
+            );
+            var entry = reader.ReadDebugDirectory().Single();
+            Check(
+                Throws<InvalidDataException>(() => PdbOutput.ReadCodeViewData(reader, image, entry)),
+                $"CodeView RVA recovery rejects {fault} instead of inventing a PDB identity"
+            );
+        }
+    }
 
     private static List<(uint Type, int Offset)> ReadFields(byte[] record)
     {

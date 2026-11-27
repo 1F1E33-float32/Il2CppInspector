@@ -9,6 +9,7 @@ dotnet artifacts/bin/Il2CppInspector.CLI/release/Il2CppInspector.dll -i GameAsse
 ## Records and Loading
 
 - Emits CodeView types, module procedures (`S_GPROC32`), global data symbols (`S_GDATA32`), public symbols and PE section headers while preserving the PE's RSDS GUID and age.
+- If static unpacking leaves a stale CodeView file pointer, resolves the debug record's RVA through the current PE sections and validates the RSDS record before using its identity. The input PE is not rewritten.
 - Types preserve ABI alignment, tail padding, arrays, unions, bitfields and type-qualified enum constants; functions include available invoker, attribute-generator, API and registration signatures.
 - When combined with disassembler targets, header generation is omitted and [debug symbol arrays are emptied in JSON](../Dwarf/README.md#scripts-and-limits).
 

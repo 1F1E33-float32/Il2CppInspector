@@ -32,7 +32,7 @@ public sealed class PdbOutput(AppModel model)
             {
                 if (entry.Type != DebugDirectoryEntryType.CodeView)
                     continue;
-                var codeView = reader.ReadCodeViewDebugDirectoryData(entry);
+                var codeView = ReadCodeViewData(reader, image, entry);
                 guid = codeView.Guid;
                 age = checked((uint)codeView.Age);
                 matching = true;
@@ -123,6 +123,58 @@ public sealed class PdbOutput(AppModel model)
         finally
         {
             image.Position = position;
+        }
+    }
+
+    internal static CodeViewDebugDirectoryData ReadCodeViewData(
+        System.Reflection.PortableExecutable.PEReader reader,
+        IFileFormatStream image,
+        DebugDirectoryEntry entry
+    )
+    {
+        try
+        {
+            return reader.ReadCodeViewDebugDirectoryData(entry);
+        }
+        catch (BadImageFormatException error)
+        {
+            // Static unpackers can move section data without updating IMAGE_DEBUG_DIRECTORY.PointerToRawData.
+            // AddressOfRawData remains an RVA; map the complete record through the current section layout.
+            var address = image.ImageBase + (uint)entry.DataRelativeVirtualAddress;
+            if (
+                entry.DataRelativeVirtualAddress <= 0
+                || entry.DataSize < 25 // RSDS + GUID + age + null-terminated path
+                || address < image.ImageBase
+                || address > ulong.MaxValue - (uint)(entry.DataSize - 1)
+                || !image.TryMapVATR(address, out var offset)
+                || offset > int.MaxValue
+                || offset == entry.DataPointer
+                || (long)offset + entry.DataSize > image.Length
+                || !image.TryMapVATR(address + (uint)entry.DataSize - 1, out var end)
+                || end != (long)offset + entry.DataSize - 1
+            )
+                throw new InvalidDataException(
+                    $"PE CodeView record is invalid at file offset 0x{entry.DataPointer:X8} and cannot be recovered from RVA 0x{entry.DataRelativeVirtualAddress:X8}.",
+                    error
+                );
+
+            var data = image.ReadBytes(offset, entry.DataSize);
+            if (!data.AsSpan(0, 4).SequenceEqual("RSDS"u8) || !data.AsSpan(24).Contains((byte)0))
+                throw new InvalidDataException(
+                    $"PE CodeView record at RVA 0x{entry.DataRelativeVirtualAddress:X8} requires an RSDS signature and a terminated PDB path.",
+                    error
+                );
+
+            var mapped = new DebugDirectoryEntry(
+                entry.Stamp,
+                entry.MajorVersion,
+                entry.MinorVersion,
+                entry.Type,
+                entry.DataSize,
+                entry.DataRelativeVirtualAddress,
+                (int)offset
+            );
+            return reader.ReadCodeViewDebugDirectoryData(mapped);
         }
     }
 }
