@@ -47,6 +47,7 @@ internal static class TotMetadataDecryptor
     private static readonly byte[] Magic = BuildMagic();
 
     // Round keys depend on the file tail; cache the last derived set for repeated loads.
+    private static readonly object RoundKeyLock = new();
     private static byte[] cachedTail;
     private static byte[] cachedRoundKeys;
 
@@ -163,32 +164,36 @@ internal static class TotMetadataDecryptor
 
     private static byte[] RoundKeysForTail(ReadOnlySpan<byte> tail)
     {
-        var tailBytes = tail.ToArray();
-        if (cachedRoundKeys != null && tailBytes.AsSpan().SequenceEqual(cachedTail))
+        // Several desktop jobs can load different metadata in the same process. Publish the tail and keys together.
+        lock (RoundKeyLock)
         {
-            return cachedRoundKeys;
-        }
-
-        var ks = KeySchedule(tailBytes);
-        var rk = new byte[176];
-        for (var r = 0; r < 11; r++)
-        {
-            for (var i = 0; i < 16; i++)
+            var tailBytes = tail.ToArray();
+            if (cachedRoundKeys != null && tailBytes.AsSpan().SequenceEqual(cachedTail))
             {
-                var offset = 256 * r + 16 * i;
-                byte value = 0;
-                for (var j = 0; j < 16; j++)
-                {
-                    value ^= (byte)(ks[offset + j] ^ Magic[offset + j]);
-                }
-
-                rk[r * 16 + i] = value;
+                return cachedRoundKeys;
             }
-        }
 
-        cachedTail = tailBytes;
-        cachedRoundKeys = rk;
-        return rk;
+            var ks = KeySchedule(tailBytes);
+            var rk = new byte[176];
+            for (var r = 0; r < 11; r++)
+            {
+                for (var i = 0; i < 16; i++)
+                {
+                    var offset = 256 * r + 16 * i;
+                    byte value = 0;
+                    for (var j = 0; j < 16; j++)
+                    {
+                        value ^= (byte)(ks[offset + j] ^ Magic[offset + j]);
+                    }
+
+                    rk[r * 16 + i] = value;
+                }
+            }
+
+            cachedTail = tailBytes;
+            cachedRoundKeys = rk;
+            return rk;
+        }
     }
 
     /// <summary>
