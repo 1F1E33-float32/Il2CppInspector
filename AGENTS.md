@@ -8,9 +8,10 @@
 - `Directory.Build.props` 统一设置 `TargetFramework=net10.0`、`ImplicitUsings=enable`、`Nullable=disable`、`TreatWarningsAsErrors=true`、`AnalysisLevel=latest`、`DebugType=embedded` 和 `SatelliteResourceLanguages=en`。两个 `VersionedSerialization*` 项目保留 `Nullable=enable`，源生成器另覆盖目标框架为 `netstandard2.0`。项目文件只声明差异；不要在禁用可空的项目里零散添加 `?` 注解，也不要重复引入隐式命名空间。
 - 原生模拟运行库使用 `UnicornEngine.Unicorn` 预编译 NuGet 包，版本由 `UnicornPackageVersion` 统一声明；NuGet 还原时自动从 GitHub Release 下载至仓库根目录的 `packages/`，由 `RestoreAdditionalProjectSources` 提供本地源，已有包直接复用。`dotnet clean` 保留该依赖源。
 - Release 构建必须 0 警告、0 错误；不通过 `#pragma`、`!` 或 `NoWarn` 规避警告。`src/Common/VersionedSerialization.Generator` 新增或修改诊断 ID 时，同步更新 `AnalyzerReleases.Unshipped.md`（Roslyn 发布跟踪，缺失时报 RS2000/RS2008）。
-- .NET 使用 SDK 的 `UseArtifactsOutput`：编译输出在 `artifacts/bin/<项目名>/<配置>/`，中间文件与 NuGet 还原文件在 `artifacts/obj/<项目名>/`；构建配置目录为小写，显式 RID 时追加 `_<rid>`，不再追加单一目标框架。`dotnet publish` 只发布最终成品到 `artifacts/publish/`，不按项目、配置或 RID 再分层；GUI、CLI 与公共依赖位于该目录根部，库、插件和测试项目不单独发布。再次发布会替换 `ArtifactsPath` 内的目标成品目录。CLI Release 入口为 `artifacts/bin/Il2CppInspector.CLI/release/Il2CppInspector.dll`，通过 `dotnet` 启动。CLI 的 build / publish 目录中，插件 DLL、依赖清单和插件专属托管依赖统一平铺到 `plugins/`；CLI 已提供的公共依赖不重复复制，native 库集中放在 `runtime/<rid>/native/`。可用 `-p:ArtifactsPath=<绝对路径>` 覆盖产物根目录。
-- `dotnet clean Il2CppInspector.slnx` 清理全部配置与 RID 的 build / publish 产物，包括 GUI 的全部 Cargo 产物；传入 `-c` 不缩小清理范围。保留 `artifacts/obj/<项目名>/` 根部的 NuGet 还原文件。根 `Directory.Build.targets` 只递归删除所选 `ArtifactsPath` 内的产物目录，GUI 通过不指定 profile 的 `cargo clean` 清理全部配置，cargo 不可用时仍删除已知 GUI 产物目录。
-- `src/GUI` 是独立的 Rust crate（GPUI 0.2.2），在 `.slnx` 中只列配置文件；`Cargo.toml` 关闭调试信息和增量编译。根 `.cargo/config.toml` 将直接运行 Cargo 的产物集中到 `artifacts/obj/Il2CppInspector.GUI/cargo/`。`src/GUI/GUI.targets` 统一管理 GUI 的 build / publish / clean；构建解决方案或发布 CLI 时执行 `cargo build --locked --profile <dev|release> --target-dir <产物根>/obj/Il2CppInspector.GUI/cargo`，并把 GUI 可执行文件复制到 `artifacts/bin/Il2CppInspector.GUI/<配置>[_<rid>]/`。发布时还将 GUI 复制到 CLI 成品目录，`--no-build` 复用此前同配置（含 RID）的解决方案构建结果。GUI 优先查找同目录或同配置（含 RID）的 CLI DLL，并通过 `dotnet` 启动；也支持可执行入口和 `IL2CPP_INSPECTOR_CLI` 覆盖。cargo 编译失败即构建失败；找不到 cargo 时给出警告并跳过 GUI 的编译，这是 0 警告要求之外唯一允许的警告。
+- .NET 使用 SDK 的 `UseArtifactsOutput`：编译输出在 `artifacts/bin/<项目名>/<配置>/`，中间文件与 NuGet 还原文件在 `artifacts/obj/<项目名>/`；构建配置目录为小写，显式 RID 时追加 `_<rid>`，不再追加单一目标框架。`dotnet publish` 只发布最终成品到 `artifacts/publish/`，不按项目、配置或 RID 再分层；GUI、CLI 与公共依赖位于该目录根部，库、插件和测试项目不单独发布。再次发布会替换 `ArtifactsPath` 内的目标成品目录。CLI Release 入口为 `artifacts/bin/Il2CppInspector.CLI/release/Il2CppInspector.dll`，通过 `dotnet` 启动。CLI 的 build / publish 目录中，插件 DLL、依赖清单和插件专属托管依赖统一平铺到 `plugins/`；CLI 已提供的公共依赖不重复复制，native 库集中放在 `runtimes/<rid>/native/`。可用 `-p:ArtifactsPath=<绝对路径>` 覆盖产物根目录。
+- `dotnet clean Il2CppInspector.slnx` 清理全部配置与 RID 的 build / publish 产物；传入 `-c` 不缩小清理范围。保留 NuGet 还原文件与 `packages/` 依赖源。根 `Directory.Build.targets` 只递归删除所选 `ArtifactsPath` 内的产物目录。
+- `src/GUI` 是 C# + Avalonia 12.2 桌面应用，项目为 `Il2CppInspector.GUI.csproj`，启用编译绑定。GUI 和 CLI 直接调用 Common 的 `AnalysisRunner`，不启动分析子进程、不使用 IPC。GUI 通过 `GamePlugins.Installed` 读取插件及输入要求。
+- CLI 引用 GUI 项目但不引用其程序集；解决方案构建会生成两个入口。发布 CLI 或解决方案时，由 CLI 先准备成品目录，再调用 GUI 发布到同一目录。GUI 不单独参与解决方案发布，避免重复清空目录；`--no-build` 复用同配置/RID 的构建结果。`src/GamePlugins.targets` 为两个宿主复制相同插件布局。GUI 入口为 `Il2CppInspector.GUI.exe`（或 `dotnet Il2CppInspector.GUI.dll`），CLI 入口保持 `Il2CppInspector`。
 - 源码放入 `src/CLI`、`src/GUI`、`src/Common/<项目名>` 或 `src/Plugins`，测试放入 `tests/<项目名>`；解决方案文件夹与磁盘目录对应。依赖中的 native runtime assets 只保留 Windows、Linux、macOS 的 x64 / ARM64 变体。
 - 新增插件项目时：
   - 目录 `src/Plugins/<GameId>/`，项目名 `Il2CppInspector.Plugin.<GameId>.csproj`（即程序集名），设置 `EnableDynamicLoading=true`、引用 Common，并显式设置 `RootNamespace` 为 `Il2CppInspector.Plugin.<game>`；
@@ -22,8 +23,9 @@
 
 | 路径 | 职责 |
 | --- | --- |
-| `src/CLI` | 命令行入口、输出目标选择、插件发现与进度显示。 |
-| `src/GUI` | Rust + GPUI 桌面前端：以 `--json-progress` 启动 CLI 子进程并显示任务进度，不链接 .NET 程序集。 |
+| `src/CLI` | 命令行解析、终端进度显示；无参数显示帮助。 |
+| `src/GUI` | C# + Avalonia 桌面界面，后台直接调用 Common；任务进度、诊断与取消相互独立。 |
+| `src/Common/Il2CppInspector.Common/Analysis` | GUI/CLI 共用请求与加载、建模、导出流程。 |
 | `src/Common/Il2CppInspector.Common/IL2CPP` | 元数据与二进制加载、版本判断、注册结构扫描。 |
 | `src/Common/Il2CppInspector.Common/Next` | 版本化元数据与二进制记录定义。 |
 | `src/Common/Il2CppInspector.Common/FileFormatStreams` | PE/ELF/Mach-O/NSO 等文件格式读取。 |
@@ -47,11 +49,11 @@
 
 ### 3.1 `src/CLI`
 
-- 只负责命令行解析、插件发现与匹配、阶段进度显示和输出目标调度，不放元数据解码或模型分析逻辑。
+- 只负责命令行解析、插件列表与终端阶段进度；加载、建模与输出调度调用 Common 的 `AnalysisRunner`。
 - 自动识别插件有歧义（多个插件同时匹配）时列出候选并要求显式传入 `--game <GameId>`；显式指定 `--game` 但无匹配或文件不匹配时直接报错退出。
 - 输出目录布局：`DummyDll/`；每个脚本目标一个 `Script_<target>/`（`il2cpp.py`、`il2cpp.json`，未选 Debug 时还有 `il2cpp.h`），头文件与 JSON 只生成一次，其余目标目录复制；Debug 在根目录写 `<binary>.pdb` 或嵌入 DWARF 的二进制。未选目标的流式导出插件仍在根目录写 `il2cpp.h` 与 `il2cpp.json`。
 - `-t IDA` 在 `Script_IDA/` 中同时输出 GUI 版 `il2cpp.py` 和 idat 终端版 `il2cpp_t.py`。终端版依赖 tqdm，支持双行进度、按 q 保存退出，以及通过脚本旁的 `.progress.json` 恢复匹配数据库中的顺序进度。
-- `--json-progress` 把 `ProgressBar` 的进度与状态改为每行一个 JSON 对象（`{"event":"progress",label,current,total,detail}` / `{"event":"status",message}`），`--list-games` 每行输出一个已安装的 `GameId`，与 `--json-progress` 同用时每行输出 `{gameId,inputs:{binary,metadata,startupMetadata}}`，供 GUI 获取插件输入需求；修改时同步更新 `src/GUI/src/cli.rs`。
+- `--json-progress` 保留为命令行自动化输出：每行一个 progress/status JSON；`--list-games` 输出 GameId，与该选项同用时附带输入需求。GUI 不依赖这些命令行选项。
 
 ### 3.2 `src/Common/Il2CppInspector.Common`
 
@@ -92,16 +94,17 @@
 
 ### 3.5 `src/GUI`
 
-- 布局为三列：启动器（游戏选择、路径、输出目标）、任务列表、任务详情，其余 CLI 选项放在可拖动的 Settings 窗口。
-- 任务详情只显示请求参数、阶段进度、最终状态和 CLI 的标准错误；其余标准输出只写入 Copy 复制的日志。CLI 的进度标签因此不带输出路径，路径写在标签前的普通输出行里。
-- 游戏选择按 `GameId` 的四段逐列展开（Game → Region → Platform → Version），某列只有一个选项时自动选中并展开下一列；Auto-detect 不传 `--game`。
-- 游戏列表与输入需求来自 `--list-games --json-progress`；GUI 按所选插件声明禁用并淡化无关路径输入框及 Select 按钮，并从请求中省略这些输入。自动识别模式允许 Metadata 留空，由 CLI 根据文件识别插件；Startup metadata 留空时由 CLI 自动查找。
-- `cargo fmt`（行宽 150，`rustfmt.toml`）、`cargo clippy --release --all-targets` 无警告；不使用 `unwrap`/`expect`/`panic`。单元测试放在各模块的 `#[cfg(test)] mod tests`。
+- 布局为三列：640px 启动器（游戏选择、路径、输出目标）、280px 任务列表、剩余宽度的任务详情；其余选项放在 560px 可拖动的 Settings 浮层，Escape 关闭。
+- 保留深色渐变、Segoe UI 13px、28px 控件、四级游戏选择表及每列独立滚动；选择列展开为 140ms ease-out-quint，连续展开错开 35ms。动画在窗口帧时钟上运行，结束后落到精确宽度。
+- 游戏选择按 GameId 的四段逐列展开；只有一个选项时自动选中。Auto-detect 不指定 Game。插件列表通过 `GamePlugins.Installed` 获取，按 `RequiredInputs` 禁用无关文件输入与 Select 按钮，并从请求中省略这些输入。Startup metadata 留空时由核心自动查找。
+- `AnalysisJob` 在后台线程调用 `AnalysisRunner`，通过线程安全队列将进度和日志交回 UI；任务列表及详情每 33ms 消费更新。详情只显示参数、阶段、最终状态和异常，其余诊断包含在 Copy 日志中。详情在底部时自动跟随，上滚暂停跟随。
+- 禁止并发任务写入相同或包含关系的输出目录（含多镜像的 output-N 目录）。取消通过 CancellationToken 与进度/导出检查点协作完成；窗口关闭时等待任务停止后退出。
+- 输入框使用 Avalonia 文本编辑控件，支持 IME、选择、剪切复制粘贴及 Home/End。可见文案沿用英文。
 
 ## 4. 进度与错误处理
 
-- CLI 耗时的加载、建模和导出阶段通过 `ProgressBar` 报告进度。
-- 库项目（Common、`src/Common/Bin2Object`、`VersionedSerialization*`）和插件不直接读写控制台，进度与状态输出统一由 CLI 处理。
+- Common 的 `AnalysisRunner` 通过 `OperationProgress` 回调报告加载、建模和导出阶段；CLI 的 `ProgressBar` 与 GUI 分别呈现。
+- 库项目和插件不直接读写控制台。普通诊断使用按执行上下文隔离的 `AnalysisLog`，状态与进度使用回调；错误向宿主抛出。不得通过 `Console.SetOut` 修改进程全局输出。
 - 用户可见的错误信息使用英文，并指明出错文件、记录或参数。
 
 ## 5. 代码风格
@@ -110,7 +113,7 @@
 
 - C# 使用 4 空格缩进、LF 换行、文件末尾换行，CSharpier 行宽 150；XML、项目文件、`.slnx`、`.props`、`.targets` 和 JSON 使用 2 空格。
 - 所有文本文件为无 BOM 的 UTF-8 和 LF，不留行尾空白（Markdown 除外）。
-- 提交前运行 `csharpier format .`。`dotnet format` 可能写入 CRLF，运行后须再执行一次 CSharpier。
+- 仅对本次改动文件运行 `csharpier format <改动路径>`，避免重排无关文件。`dotnet format` 可能写入 CRLF，运行后须再执行一次 CSharpier。
 - Python 脚本资源使用 4 空格缩进；`RuntimeCaches.py` 是插入 `shared_base.py` 占位符的片段，单独编译会报缩进错误，属于正常情况。
 
 ### 语言特性
@@ -184,8 +187,8 @@
 在仓库根目录执行：
 
 ```bash
-csharpier format .
-csharpier check .
+csharpier format <改动路径>
+csharpier check <改动路径>
 dotnet build Il2CppInspector.slnx -c Release
 # 不需要本地游戏文件的测试
 dotnet run --project tests/Il2CppInspector.Tests -c Release --no-build -- --plugins
@@ -193,11 +196,11 @@ dotnet run --project tests/Il2CppInspector.Tests -c Release --no-build -- --seri
 dotnet run --project tests/Il2CppInspector.Tests -c Release --no-build -- --progress
 dotnet run --project tests/Il2CppInspector.Tests -c Release --no-build -- --cli-targets artifacts/bin/Il2CppInspector.CLI/release/Il2CppInspector.dll
 dotnet run --project tests/Il2CppInspector.Tests -c Release --no-build -- --cpp-layout
+dotnet run --project tests/Il2CppInspector.Tests -c Release --no-build -- --unity-headers
+dotnet run --project tests/Il2CppInspector.Tests -c Release --no-build -- --metadata-version
 python -I tests/Il2CppInspector.Tests/Common/Outputs/ScriptResourcesTests.py
-# 修改 GUI 时（在 src/GUI/ 下）
-cargo fmt --check
-cargo clippy --release --all-targets
-cargo test --release
+# 验证 GUI/CLI 联合发布与插件布局
+dotnet publish Il2CppInspector.slnx -c Release -r win-x64 --self-contained false
 # 修改插件时在真实样本上运行
 dotnet run --project tests/Il2CppInspector.Tests -c Release --no-build -- --game <GameId> <样本 Native 目录> [输出目录]
 ```
@@ -207,7 +210,7 @@ dotnet run --project tests/Il2CppInspector.Tests -c Release --no-build -- --game
 ## 8. 文档与交付
 
 - 保留工作树中已有的未提交改动：不执行 `git checkout`/`restore`/`reset --hard`/`stash`/`clean` 等会丢弃改动的命令；除非明确要求，不要提交。
-- 不提交 `artifacts/`、`bin/`、`obj/`、`output/` 和 `target/` 等生成内容；`src/GUI/Cargo.lock` 需要提交。
+- 不提交 `artifacts/`、`bin/`、`obj/` 和 `output/` 等生成内容。
 - 支持的游戏、`GameId` 或 CLI 选项变化时，同步更新 `tests/Il2CppInspector.Tests/Plugin/GameSampleTests.cs` 的 `Samples` 表和 CLI 帮助文本。
 - 提交信息使用 Conventional Commits 格式：`type(scope): summary`。
   - `type` 取 `feat`、`fix`、`refactor`、`perf`、`test`、`docs`、`chore`；
