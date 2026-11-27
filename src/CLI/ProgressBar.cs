@@ -13,25 +13,36 @@ namespace Il2CppInspector.CLI
         private static int lastLineLength;
         private static int lastBucket = -2;
         private static long lastRefresh;
-        private static long generation;
-        private static bool running;
 
         // Set by --json-progress: progress and status messages become one JSON object per line for front ends.
         public static bool JsonLines { get; set; }
+
+        internal static IDisposable RefreshContinuously() =>
+            new Timer(
+                static _ =>
+                {
+                    lock (Sync)
+                        Draw(false);
+                },
+                null,
+                100,
+                100
+            );
 
         public static void Update(OperationProgress progress)
         {
             lock (Sync)
             {
-                if (active == null || active.Value.Label != progress.Label)
+                if (active is null || active.Value.Label != progress.Label)
                 {
                     FinishLine();
                     RestartTiming();
                 }
                 active = progress;
-                bool complete = progress.Total >= 0 && progress.Current >= progress.Total;
-                Draw(complete);
-                if (complete && !running)
+                var complete = progress.Total >= 0 && progress.Current >= progress.Total;
+                var ended = progress.Detail is "done" or "failed" or "cancelled";
+                Draw(complete || ended);
+                if (complete || ended)
                     FinishLine();
             }
         }
@@ -44,70 +55,6 @@ namespace Il2CppInspector.CLI
                 Console.WriteLine(JsonLines ? JsonSerializer.Serialize(new { @event = "status", message }) : $"  {message}");
             }
         }
-
-        public static void Fail()
-        {
-            lock (Sync)
-            {
-                if (active != null)
-                {
-                    running = false;
-                    active = active.Value with { Detail = "failed" };
-                    Draw(true);
-                    FinishLine();
-                }
-            }
-        }
-
-        public static void Run(string label, Action<Action<OperationProgress>> action)
-        {
-            long id;
-            lock (Sync)
-            {
-                FinishLine();
-                running = true;
-                id = ++generation;
-                active = new OperationProgress(label, 0, -1);
-                RestartTiming();
-            }
-            using var timer = new Timer(
-                _ =>
-                {
-                    lock (Sync)
-                        if (running && generation == id)
-                            Draw(false);
-                },
-                null,
-                100,
-                100
-            );
-            try
-            {
-                action(Update);
-                lock (Sync)
-                {
-                    var progress = active ?? new OperationProgress(label, 0, -1);
-                    long total = Math.Max(0, progress.Total);
-                    running = false;
-                    Update(progress with { Current = total, Total = total, Detail = "done" });
-                }
-            }
-            catch
-            {
-                Fail();
-                throw;
-            }
-            finally
-            {
-                lock (Sync)
-                {
-                    running = false;
-                    FinishLine();
-                }
-            }
-        }
-
-        public static void Run(string label, Action action) => Run(label, _ => action());
 
         internal static string Render(OperationProgress progress, TimeSpan elapsed, int width = int.MaxValue)
         {
@@ -143,9 +90,7 @@ namespace Il2CppInspector.CLI
 
         private static void Draw(bool force)
         {
-            if (active == null)
-                return;
-            if (running && active.Value.Total >= 0 && active.Value.Current >= active.Value.Total)
+            if (active is null)
                 return;
             if (JsonLines)
             {

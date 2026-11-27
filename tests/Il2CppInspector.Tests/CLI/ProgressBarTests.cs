@@ -10,23 +10,16 @@ internal static class ProgressBarTests
         using var output = new StringWriter();
         string success;
         string failure;
-        bool propagated;
         try
         {
             Console.SetOut(output);
-            ProgressBar.Run(
-                "Generating DummyDlls",
-                report =>
-                {
-                    for (int i = 0; i < 100; i++)
-                        report(new OperationProgress("Generating DummyDlls", i, 100));
-                }
-            );
+            for (var i = 0; i < 100; i++)
+                ProgressBar.Update(new OperationProgress("Generating DummyDlls", i, 100));
+            ProgressBar.Update(new OperationProgress("Generating DummyDlls", 100, 100, "done"));
             success = output.ToString();
             output.GetStringBuilder().Clear();
-            propagated = Throws<InvalidOperationException>(() =>
-                ProgressBar.Run("Building type model", _ => throw new InvalidOperationException("fixture"))
-            );
+            ProgressBar.Update(new OperationProgress("Building type model", 0, -1));
+            ProgressBar.Update(new OperationProgress("Building type model", 0, -1, "failed"));
             failure = output.ToString();
             output.GetStringBuilder().Clear();
             ProgressBar.Update(new OperationProgress("Processing relocations", 1000, 2000));
@@ -39,8 +32,8 @@ internal static class ProgressBarTests
         }
         Check(success.Contains("100%") && success.Contains("done"), "Successful operations finish at 100 percent");
         Check(
-            propagated && failure.Contains("failed") && !failure.Contains("100%") && !failure.Contains("done"),
-            "Failed operations propagate exceptions and do not claim completion"
+            failure.Contains("failed") && !failure.Contains("100%") && !failure.Contains("done"),
+            "Failed operations report failure without claiming completion"
         );
         Check(
             output.ToString().Contains("100%") && output.ToString().Contains("Processed 2000 relocations"),
@@ -59,14 +52,9 @@ internal static class ProgressBarTests
         try
         {
             Console.SetOut(output);
-            ProgressBar.Run(
-                "Generating DummyDlls",
-                report =>
-                {
-                    for (int i = 0; i < 100; i++)
-                        report(new OperationProgress("Generating DummyDlls", i, 100, "fixture"));
-                }
-            );
+            for (var i = 0; i < 100; i++)
+                ProgressBar.Update(new OperationProgress("Generating DummyDlls", i, 100, "fixture"));
+            ProgressBar.Update(new OperationProgress("Generating DummyDlls", 100, 100, "done"));
             ProgressBar.WriteStatus("Processed 2000 relocations");
         }
         finally

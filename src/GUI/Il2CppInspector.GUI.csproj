@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Avalonia" Version="12.2.0" />
+    <PackageReference Include="Avalonia.Desktop" Version="12.2.0" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="12.2.0" />
+    <ProjectReference Include="../Common/Il2CppInspector.Common/Il2CppInspector.Common.csproj" />
+    <GamePluginProjects Include="../Plugins/*/*.csproj" />
+    <ProjectReference Include="@(GamePluginProjects)" ReferenceOutputAssembly="false" />
+  </ItemGroup>
+  <Import Project="../GamePlugins.targets" />
+</Project>

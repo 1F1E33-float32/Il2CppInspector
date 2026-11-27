@@ -1,0 +1,41 @@
+<Project>
+  <Target Name="CollectGamePluginFiles">
+    <!-- Non-publishable plugins may not have been built by a fresh solution publish. Use the same portable configuration as SDK references. -->
+    <MSBuild
+      Condition="'$(NoBuild)' != 'true'"
+      Projects="@(GamePluginProjects)"
+      Targets="Build"
+      Properties="Configuration=$(Configuration);BuildProjectReferences=true"
+      RemoveProperties="RuntimeIdentifier;SelfContained;IsPublishable"
+      BuildInParallel="true"
+    />
+    <MSBuild
+      Projects="@(GamePluginProjects)"
+      Targets="GetGamePluginOutput"
+      Properties="Configuration=$(Configuration);BuildProjectReferences=false"
+      RemoveProperties="RuntimeIdentifier;SelfContained;IsPublishable"
+      BuildInParallel="true"
+    >
+      <Output TaskParameter="TargetOutputs" ItemName="_GamePluginFiles" />
+    </MSBuild>
+    <ItemGroup>
+      <!-- The host already supplies Common and its dependencies through the default load context. -->
+      <_GamePluginFiles Remove="@(ReferenceCopyLocalPaths)" MatchOnMetadata="Filename;Extension" />
+    </ItemGroup>
+    <RemoveDuplicates Inputs="@(_GamePluginFiles)">
+      <Output TaskParameter="Filtered" ItemName="GamePluginFiles" />
+    </RemoveDuplicates>
+    <ItemGroup>
+      <LegacyGamePluginFiles Include="@(GamePluginFiles)" Condition="'%(GamePluginFiles.LegacyPluginDirectory)' != ''" />
+    </ItemGroup>
+  </Target>
+  <Target Name="CopyGamePlugins" AfterTargets="Build" DependsOnTargets="CollectGamePluginFiles">
+    <!-- Remove the previous per-game layout only for plugins built by this project. -->
+    <RemoveDir Directories="@(LegacyGamePluginFiles->'$(OutDir)plugins/%(LegacyPluginDirectory)')" />
+    <Copy SourceFiles="@(GamePluginFiles)" DestinationFiles="@(GamePluginFiles->'$(OutDir)%(PackagePath)')" SkipUnchangedFiles="true" />
+  </Target>
+  <Target Name="PublishGamePlugins" AfterTargets="Publish" DependsOnTargets="CollectGamePluginFiles" Condition="'$(IsPublishable)' == 'true'">
+    <RemoveDir Directories="@(LegacyGamePluginFiles->'$(PublishDir)plugins/%(LegacyPluginDirectory)')" />
+    <Copy SourceFiles="@(GamePluginFiles)" DestinationFiles="@(GamePluginFiles->'$(PublishDir)%(PackagePath)')" SkipUnchangedFiles="true" />
+  </Target>
+</Project>

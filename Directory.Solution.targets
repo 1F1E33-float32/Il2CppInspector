@@ -1,5 +1,0 @@
-<Project>
-  <Import Project="$(MSBuildThisFileDirectory)src/GUI/GUI.targets" />
-
-  <Target Name="BuildSolutionGui" AfterTargets="Build;Rebuild" DependsOnTargets="BuildGui" />
-</Project>

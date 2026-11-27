@@ -2,16 +2,22 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <IsPublishable>true</IsPublishable>
-    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <AssemblyName>Il2CppInspector</AssemblyName>
   </PropertyGroup>
 
   <ItemGroup>
     <ProjectReference Include="../Common/Il2CppInspector.Common/Il2CppInspector.Common.csproj" />
+    <ProjectReference Include="../GUI/Il2CppInspector.GUI.csproj" ReferenceOutputAssembly="false" />
     <GamePluginProjects Include="../Plugins/*/*.csproj" />
     <ProjectReference Include="@(GamePluginProjects)" ReferenceOutputAssembly="false" />
   </ItemGroup>
-  <Import Project="../GUI/GUI.targets" />
+  <Target Name="PublishGui" AfterTargets="Publish">
+    <MSBuild
+      Projects="../GUI/Il2CppInspector.GUI.csproj"
+      Targets="Publish"
+      Properties="Configuration=$(Configuration);RuntimeIdentifier=$(RuntimeIdentifier);SelfContained=$(SelfContained);PublishDir=$(PublishDir);IsPublishable=true;NoBuild=$(NoBuild)"
+    />
+  </Target>
   <Target Name="PreparePublishBundle" BeforeTargets="PrepareForPublish">
     <PropertyGroup>
       <_PublishArtifactsRoot>$([MSBuild]::NormalizeDirectory('$(MSBuildProjectDirectory)', '$(ArtifactsPath)'))</_PublishArtifactsRoot>
@@ -23,35 +29,5 @@
       Condition="$([System.String]::Copy('$(_PublishBundleDirectory)').StartsWith('$(_PublishArtifactsRoot)', System.StringComparison.OrdinalIgnoreCase)) and '$(_PublishBundleDirectory)' != '$(_PublishArtifactsRoot)'"
     />
   </Target>
-  <Target Name="CollectGamePluginFiles">
-    <!-- SDK project references build these class libraries without the executable's RID or self-contained settings. -->
-    <MSBuild
-      Projects="@(GamePluginProjects)"
-      Targets="GetGamePluginOutput"
-      Properties="Configuration=$(Configuration)"
-      RemoveProperties="RuntimeIdentifier;SelfContained"
-      BuildInParallel="true"
-    >
-      <Output TaskParameter="TargetOutputs" ItemName="_GamePluginFiles" />
-    </MSBuild>
-    <ItemGroup>
-      <!-- The host already supplies Common and its dependencies through the default load context. -->
-      <_GamePluginFiles Remove="@(ReferenceCopyLocalPaths)" MatchOnMetadata="Filename;Extension" />
-    </ItemGroup>
-    <RemoveDuplicates Inputs="@(_GamePluginFiles)">
-      <Output TaskParameter="Filtered" ItemName="GamePluginFiles" />
-    </RemoveDuplicates>
-    <ItemGroup>
-      <LegacyGamePluginFiles Include="@(GamePluginFiles)" Condition="'%(GamePluginFiles.LegacyPluginDirectory)' != ''" />
-    </ItemGroup>
-  </Target>
-  <Target Name="CopyGamePlugins" AfterTargets="Build" DependsOnTargets="CollectGamePluginFiles">
-    <!-- Remove the previous per-game layout only for plugins built by this project. -->
-    <RemoveDir Directories="@(LegacyGamePluginFiles->'$(OutDir)plugins/%(LegacyPluginDirectory)')" />
-    <Copy SourceFiles="@(GamePluginFiles)" DestinationFiles="@(GamePluginFiles->'$(OutDir)%(PackagePath)')" SkipUnchangedFiles="true" />
-  </Target>
-  <Target Name="PublishGamePlugins" AfterTargets="Publish" DependsOnTargets="CollectGamePluginFiles">
-    <RemoveDir Directories="@(LegacyGamePluginFiles->'$(PublishDir)plugins/%(LegacyPluginDirectory)')" />
-    <Copy SourceFiles="@(GamePluginFiles)" DestinationFiles="@(GamePluginFiles->'$(PublishDir)%(PackagePath)')" SkipUnchangedFiles="true" />
-  </Target>
+  <Import Project="../GamePlugins.targets" />
 </Project>

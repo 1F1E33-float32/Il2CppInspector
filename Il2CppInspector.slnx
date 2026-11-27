@@ -4,11 +4,10 @@
     <File Path=".csharpierrc.json" />
     <File Path=".gitattributes" />
     <File Path=".gitignore" />
-    <File Path=".cargo/config.toml" />
     <File Path="AGENTS.md" />
     <File Path="Directory.Build.props" />
     <File Path="Directory.Build.targets" />
-    <File Path="Directory.Solution.targets" />
+    <File Path="src/GamePlugins.targets" />
   </Folder>
   <Folder Name="/src/" />
   <Folder Name="/src/CLI/">
@@ -21,10 +20,7 @@
     <Project Path="src/Common/VersionedSerialization/VersionedSerialization.csproj" Id="7460288e-63b2-493a-9cca-1cf6a3121d0d" />
   </Folder>
   <Folder Name="/src/GUI/">
-    <File Path="src/GUI/Cargo.toml" />
-    <File Path="src/GUI/Cargo.lock" />
-    <File Path="src/GUI/GUI.targets" />
-    <File Path="src/GUI/rustfmt.toml" />
+    <Project Path="src/GUI/Il2CppInspector.GUI.csproj" />
   </Folder>
   <Folder Name="/src/Plugins/" />
   <Folder Name="/src/Plugins/ABC/">
@@ -36,11 +32,14 @@
   <Folder Name="/src/Plugins/Arknights/">
     <Project Path="src/Plugins/Arknights_CN_Windows_2.7.91/Il2CppInspector.Plugin.Arknights_CN_Windows_2.7.91.csproj" />
   </Folder>
-  <Folder Name="/src/Plugins/Cy/">
-    <Project Path="src/Plugins/Cy_JP_Windows_x.x.x/Il2CppInspector.Plugin.Cy_JP_Windows_x.x.x.csproj" />
+  <Folder Name="/src/Plugins/AzurPromilia/">
+    <Project Path="src/Plugins/AzurPromilia_xx_Windows_x.x.x/Il2CppInspector.Plugin.AzurPromilia_xx_Windows_x.x.x.csproj" />
   </Folder>
   <Folder Name="/src/Plugins/BH3/">
     <Project Path="src/Plugins/BH3_CN_Windows_9.1.0/Il2CppInspector.Plugin.BH3_CN_Windows_9.1.0.csproj" />
+  </Folder>
+  <Folder Name="/src/Plugins/Cy/">
+    <Project Path="src/Plugins/Cy_JP_Windows_x.x.x/Il2CppInspector.Plugin.Cy_JP_Windows_x.x.x.csproj" />
   </Folder>
   <Folder Name="/src/Plugins/Endfield/">
     <Project Path="src/Plugins/Endfield_CN_Android_x.x.x/Il2CppInspector.Plugin.Endfield_CN_Android_x.x.x.csproj" />

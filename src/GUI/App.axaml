@@ -1,0 +1,125 @@
+<Application
+  xmlns="https://github.com/avaloniaui"
+  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+  x:Class="Il2CppInspector.GUI.App"
+  RequestedThemeVariant="Dark"
+>
+  <Application.Resources>
+    <SolidColorBrush x:Key="TextControlPlaceholderForeground">#6BDCDCDC</SolidColorBrush>
+    <SolidColorBrush x:Key="TextControlPlaceholderForegroundPointerOver">#6BDCDCDC</SolidColorBrush>
+    <SolidColorBrush x:Key="TextControlPlaceholderForegroundFocused">#6BDCDCDC</SolidColorBrush>
+    <SolidColorBrush x:Key="TextControlPlaceholderForegroundDisabled">#6BDCDCDC</SolidColorBrush>
+    <SolidColorBrush x:Key="TextControlForeground">#F0F5F5F7</SolidColorBrush>
+    <SolidColorBrush x:Key="TextControlForegroundPointerOver">#F0F5F5F7</SolidColorBrush>
+    <SolidColorBrush x:Key="TextControlForegroundFocused">#F0F5F5F7</SolidColorBrush>
+    <SolidColorBrush x:Key="TextControlForegroundDisabled">#F0F5F5F7</SolidColorBrush>
+    <x:Double x:Key="TextControlPlaceholderOpacity">1</x:Double>
+  </Application.Resources>
+  <Application.Styles>
+    <FluentTheme />
+    <Style Selector="Window">
+      <Setter Property="FontFamily" Value="Segoe UI" />
+      <Setter Property="FontSize" Value="13" />
+      <Setter Property="Foreground" Value="#F0F5F5F7" />
+    </Style>
+    <Style Selector="TextBlock">
+      <Setter Property="LineHeight" Value="18" />
+    </Style>
+    <Style Selector="Button">
+      <Setter Property="MinWidth" Value="0" />
+      <Setter Property="MinHeight" Value="0" />
+      <Setter Property="Height" Value="28" />
+      <Setter Property="Padding" Value="14,0" />
+      <Setter Property="FontSize" Value="13" />
+      <Setter Property="FontWeight" Value="Medium" />
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+      <Setter Property="CornerRadius" Value="8" />
+      <Setter Property="Background" Value="#1AFFFFFF" />
+      <Setter Property="BorderBrush" Value="#17FFFFFF" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="Foreground" Value="#F0F5F5F7" />
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Border
+            Background="{TemplateBinding Background}"
+            BorderBrush="{TemplateBinding BorderBrush}"
+            BorderThickness="{TemplateBinding BorderThickness}"
+            CornerRadius="{TemplateBinding CornerRadius}"
+          >
+            <ContentPresenter
+              Name="PART_ContentPresenter"
+              Content="{TemplateBinding Content}"
+              ContentTemplate="{TemplateBinding ContentTemplate}"
+              Padding="{TemplateBinding Padding}"
+              HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+              VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"
+            />
+          </Border>
+        </ControlTemplate>
+      </Setter>
+    </Style>
+    <Style Selector="Button:pointerover">
+      <Setter Property="Background" Value="#26FFFFFF" />
+    </Style>
+    <Style Selector="Button.primary">
+      <Setter Property="Background" Value="#0A84FF" />
+      <Setter Property="BorderBrush" Value="Transparent" />
+      <Setter Property="Foreground" Value="White" />
+    </Style>
+    <Style Selector="Button.primary:pointerover">
+      <Setter Property="Background" Value="#409CFF" />
+    </Style>
+    <Style Selector="Button.danger">
+      <Setter Property="Background" Value="#E5392F" />
+      <Setter Property="BorderBrush" Value="Transparent" />
+      <Setter Property="Foreground" Value="White" />
+    </Style>
+    <Style Selector="Button.danger:pointerover">
+      <Setter Property="Background" Value="#FF5147" />
+    </Style>
+    <Style Selector="Button.segment">
+      <Setter Property="Height" Value="22" />
+      <Setter Property="Padding" Value="12,0" />
+      <Setter Property="CornerRadius" Value="6" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="Foreground" Value="#A3EBEBEB" />
+    </Style>
+    <Style Selector="Button.segment:pointerover">
+      <Setter Property="Foreground" Value="#F0F5F5F7" />
+    </Style>
+    <Style Selector="Button.segment.active">
+      <Setter Property="Background" Value="#0A84FF" />
+      <Setter Property="Foreground" Value="White" />
+    </Style>
+    <Style Selector="Button:disabled">
+      <Setter Property="Opacity" Value="0.4" />
+    </Style>
+    <Style Selector="TextBox">
+      <Setter Property="MinHeight" Value="0" />
+      <Setter Property="Height" Value="28" />
+      <Setter Property="Padding" Value="9,0" />
+      <Setter Property="FontSize" Value="13" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+      <Setter Property="CornerRadius" Value="8" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="Background" Value="#38000000" />
+      <Setter Property="BorderBrush" Value="#1AFFFFFF" />
+      <Setter Property="Foreground" Value="#F0F5F5F7" />
+      <Setter Property="SelectionBrush" Value="#590A84FF" />
+      <Setter Property="CaretBrush" Value="#8DBDFF" />
+    </Style>
+    <Style Selector="TextBox /template/ Border#PART_BorderElement">
+      <Setter Property="Background" Value="#38000000" />
+      <Setter Property="BorderBrush" Value="#1AFFFFFF" />
+    </Style>
+    <Style Selector="TextBox:focus /template/ Border#PART_BorderElement">
+      <Setter Property="BorderBrush" Value="#0A84FF" />
+      <Setter Property="BoxShadow" Value="0 0 0 3 #290A84FF" />
+    </Style>
+    <Style Selector="TextBox:disabled">
+      <Setter Property="Opacity" Value="0.4" />
+    </Style>
+  </Application.Styles>
+</Application>
