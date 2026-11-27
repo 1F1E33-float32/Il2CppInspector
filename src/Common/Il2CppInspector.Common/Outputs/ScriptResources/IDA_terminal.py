@@ -1,6 +1,5 @@
 # Terminal-only additions. The regular IDA implementation above supplies the API calls.
 import contextlib
-import hashlib
 import sys
 import time
 import traceback
@@ -221,9 +220,8 @@ class TerminalScriptContext(ScriptContext):
 
 
 def _file_identity(path):
-    path = Path(path).resolve()
-    stat = path.stat()
-    return dict(path=os.path.normcase(str(path)), size=stat.st_size, mtime_ns=stat.st_mtime_ns)
+    stat = Path(path).stat()
+    return dict(size=stat.st_size, mtime_ns=stat.st_mtime_ns)
 
 
 def _checkpoint_identity(backend):
@@ -234,12 +232,10 @@ def _checkpoint_identity(backend):
         and not backend.function_boundaries_only
     )
     identity = dict(
-        database=os.path.normcase(str(Path(ida_loader.get_path(ida_loader.PATH_TYPE_IDB)).resolve())),
         input_sha256=(ida_nalt.retrieve_input_file_sha256() or b"").hex(),
         imagebase=ida_nalt.get_imagebase(),
         metadata=_file_identity(directory / "%JSON_METADATA_RELATIVE_PATH%"),
         header=_file_identity(directory / header) if imports_header else None,
-        script_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
         settings=dict(
             function_boundaries_only=backend.function_boundaries_only,
             apply_structures=backend.apply_structures,
@@ -254,8 +250,16 @@ def _load_checkpoint(path, identity, node):
     if not path.exists():
         return None
     record = json.loads(path.read_text(encoding="utf-8"))
-    if record.get("version") != 1 or record.get("identity") != identity:
-        raise ValueError("Checkpoint does not match this database, input files, script, or options.")
+    saved_identity = record.get("identity")
+    if isinstance(saved_identity, dict):
+        # Older checkpoints included paths and the generated script hash. These no longer constrain resume.
+        saved_identity.pop("database", None)
+        saved_identity.pop("script_sha256", None)
+        for name in ("metadata", "header"):
+            if isinstance(saved_identity.get(name), dict):
+                saved_identity[name].pop("path", None)
+    if record.get("version") != 1 or saved_identity != identity:
+        raise ValueError("Checkpoint does not match the input data, image base, or options.")
     if record.get("commit") != node.supstr(0):
         raise ValueError("Checkpoint does not match the saved database. Reopen its matching database before resuming.")
     stage, index = record["stage"], record["index"]
@@ -269,7 +273,6 @@ def _save_checkpoint(path, identity, status, node):
     destination = Path(ida_loader.get_path(ida_loader.PATH_TYPE_IDB))
     if (
         ida_segment.get_segm_qty() == 0
-        or os.path.normcase(str(destination.resolve())) != identity["database"]
         or ida_nalt.get_imagebase() != identity["imagebase"]
         or (ida_nalt.retrieve_input_file_sha256() or b"").hex() != identity["input_sha256"]
     ):

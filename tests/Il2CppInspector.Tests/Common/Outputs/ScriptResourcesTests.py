@@ -223,7 +223,7 @@ class ScriptResourcesTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             checkpoint = Path(directory) / "il2cpp_t.progress.json"
             database = Path(directory) / "test.i64"
-            identity = dict(database=os.path.normcase(str(database.resolve())), imagebase=0x180000000, input_sha256=b"input".hex())
+            identity = dict(imagebase=0x180000000, input_sha256=b"input".hex())
             checkpoint.write_text("previous")
             ns["ida_loader"].get_path.return_value = str(database)
             def save(*args):
@@ -249,9 +249,15 @@ class ScriptResourcesTests(unittest.TestCase):
             node.supstr.return_value = "another-database"
             with self.assertRaisesRegex(ValueError, "saved database"):
                 ns["_load_checkpoint"](checkpoint, identity, node)
-            with self.assertRaisesRegex(ValueError, "input files"):
-                ns["_load_checkpoint"](checkpoint, {"database": "different"}, node)
+            with self.assertRaisesRegex(ValueError, "input data"):
+                ns["_load_checkpoint"](checkpoint, {**identity, "imagebase": 0}, node)
             ns["ida_loader"].save_database.side_effect = None
+            # Save As may change the destination without invalidating the import state.
+            moved_database = database.with_name("renamed.i64")
+            loader.get_path.return_value = str(moved_database)
+            loader.save_database.return_value = True
+            self.assertTrue(ns["_save_checkpoint"](checkpoint, identity, status, node))
+            loader.save_database.assert_called_with(str(moved_database), 0)
             ns["ida_loader"].save_database.return_value = False
             before = checkpoint.read_bytes()
             auto.reset_mock()
@@ -274,18 +280,70 @@ class ScriptResourcesTests(unittest.TestCase):
             ns["ida_loader"].save_database.reset_mock()
             node.reset_mock()
             auto.reset_mock()
-            for field in ("segments", "imagebase", "input", "path"):
+            for field in ("segments", "imagebase", "input"):
                 with self.subTest(changed=field):
                     segment.get_segm_qty.return_value = 0 if field == "segments" else 1
                     nalt.get_imagebase.return_value = 0 if field == "imagebase" else 0x180000000
                     nalt.retrieve_input_file_sha256.return_value = b"" if field == "input" else b"input"
-                    loader.get_path.return_value = str(database.with_name("other.i64") if field == "path" else database)
+                    loader.get_path.return_value = str(moved_database)
                     with self.assertRaisesRegex(ValueError, "active database changed"):
                         ns["_save_checkpoint"](checkpoint, identity, status, node)
                     self.assertEqual(checkpoint.read_bytes(), before)
                     ns["ida_loader"].save_database.assert_not_called()
                     node.supset.assert_not_called()
                     auto.enable_auto.assert_not_called()
+
+    def test_terminal_resume_ignores_old_paths_and_script_hash_after_moving_files(self):
+        nalt = Mock()
+        nalt.get_imagebase.return_value = 0x180000000
+        nalt.retrieve_input_file_sha256.return_value = b"input"
+        loader = Mock(PATH_TYPE_IDB=1)
+        node = Mock()
+        node.supstr.return_value = "saved-marker"
+        ns = terminal_classes(ida_nalt=nalt, ida_loader=loader)
+        backend = Backend(True, False)
+        backend.import_type_header = True
+        with tempfile.TemporaryDirectory() as directory:
+            original = Path(directory) / "original"
+            original.mkdir()
+            metadata_file = original / "%JSON_METADATA_RELATIVE_PATH%"
+            header_file = original / "%TYPE_HEADER_RELATIVE_PATH%"
+            metadata_file.write_text("{}")
+            header_file.write_text("struct Type {};")
+            script = original / "il2cpp_t.py"
+            script.write_text("original script")
+            ns["__file__"] = str(script)
+            backend.get_script_directory = lambda: original
+            identity, imports_header = ns["_checkpoint_identity"](backend)
+            self.assertTrue(imports_header)
+            legacy = {**identity, "database": str(original / "old.i64"), "script_sha256": "old-script-hash"}
+            legacy["metadata"] = {**identity["metadata"], "path": str(metadata_file)}
+            legacy["header"] = {**identity["header"], "path": str(header_file)}
+            checkpoint = original / "il2cpp_t.progress.json"
+            checkpoint.write_text(json.dumps(dict(version=1, identity=legacy, commit="saved-marker", stage=3, index=2)))
+
+            moved = Path(directory) / "moved"
+            original.rename(moved)
+            script = moved / "il2cpp_t.py"
+            script.write_text("edited script with different contents and length")
+            ns["__file__"] = str(script)
+            backend.get_script_directory = lambda: moved
+            loader.get_path.return_value = str(moved / "renamed.i64")
+            nalt.get_input_file_path.return_value = str(moved / "renamed.dll")
+            current, _ = ns["_checkpoint_identity"](backend)
+            checkpoint = moved / checkpoint.name
+            self.assertEqual(ns["_load_checkpoint"](checkpoint, current, node), (3, 2))
+            self.assertNotIn("database", current)
+            self.assertNotIn("script_sha256", current)
+            self.assertNotIn("path", current["metadata"])
+            self.assertNotIn("path", current["header"])
+            loader.get_path.assert_not_called()
+            nalt.get_input_file_path.assert_not_called()
+
+            record = json.loads(checkpoint.read_text())
+            record["identity"] = current
+            checkpoint.write_text(json.dumps(record))
+            self.assertEqual(ns["_load_checkpoint"](checkpoint, current, node), (3, 2))
 
     def test_terminal_q_unwinds_import_before_exit_and_failed_save_keeps_database_open(self):
         import sys
