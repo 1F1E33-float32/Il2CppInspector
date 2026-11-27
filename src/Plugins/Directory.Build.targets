@@ -13,9 +13,9 @@
         <PackagePath>plugins/%(ReferenceCopyLocalPaths.DestinationSubDirectory)%(Filename)%(Extension)</PackagePath>
       </GamePluginOutput>
       <GamePluginOutput Include="@(ReferenceCopyLocalPaths)" Condition="'%(ReferenceCopyLocalPaths.AssetType)' == 'native'">
-        <PackagePath>runtime/%(ReferenceCopyLocalPaths.RuntimeIdentifier)/native/%(Filename)%(Extension)</PackagePath>
+        <PackagePath>runtimes/%(ReferenceCopyLocalPaths.RuntimeIdentifier)/native/%(Filename)%(Extension)</PackagePath>
         <PackagePath Condition="'%(ReferenceCopyLocalPaths.RuntimeIdentifier)' == ''"
-          >runtime/$(RuntimeIdentifier)/native/%(Filename)%(Extension)</PackagePath>
+          >runtimes/$(RuntimeIdentifier)/native/%(Filename)%(Extension)</PackagePath>
       </GamePluginOutput>
       <GamePluginOutput Include="@(None)" Condition="'%(None.CopyToOutputDirectory)' != '' and '%(None.CopyToOutputDirectory)' != 'Never'">
         <PackagePath>%(None.Link)</PackagePath>

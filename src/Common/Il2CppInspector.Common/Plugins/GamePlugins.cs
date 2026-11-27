@@ -126,8 +126,8 @@ namespace Il2CppInspector.Plugins
 
         private static IntPtr ResolveNativeLibrary(Assembly _, string libraryName)
         {
-            // Native assets are shared by all plugins in runtime/<rid>/native rather than beside each DLL.
-            var directory = Path.Combine(AppContext.BaseDirectory, "runtime", RuntimeInformation.RuntimeIdentifier, "native");
+            // Native assets are shared by all plugins in runtimes/<rid>/native rather than beside each DLL.
+            var directory = Path.Combine(AppContext.BaseDirectory, "runtimes", RuntimeInformation.RuntimeIdentifier, "native");
             var extension =
                 OperatingSystem.IsWindows() ? ".dll"
                 : OperatingSystem.IsMacOS() ? ".dylib"

@@ -26,17 +26,17 @@ namespace Il2CppInspector.Tests.CLI
                     .Any(),
                 "Host dependencies are not copied into plugins/"
             );
-            var nativeFiles = Directory.EnumerateFiles(Path.Combine(directory, "runtime"), "*", SearchOption.AllDirectories).ToArray();
+            var nativeFiles = Directory.EnumerateFiles(Path.Combine(directory, "runtimes"), "*", SearchOption.AllDirectories).ToArray();
             Check(
                 nativeFiles.Length > 0
                     && nativeFiles.All(path =>
                     {
-                        var relative = Path.GetRelativePath(Path.Combine(directory, "runtime"), path).Split(Path.DirectorySeparatorChar);
+                        var relative = Path.GetRelativePath(Path.Combine(directory, "runtimes"), path).Split(Path.DirectorySeparatorChar);
                         return relative.Length == 3
                             && relative[0] is "win-x64" or "win-arm64" or "linux-x64" or "linux-arm64" or "osx-x64" or "osx-arm64"
                             && relative[1] == "native";
                     }),
-                "Native dependencies use runtime/<supported-rid>/native/"
+                "Native dependencies use runtimes/<supported-rid>/native/"
             );
             var available = RunCli(cli);
             Check(
