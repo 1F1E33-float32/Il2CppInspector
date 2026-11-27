@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+    <RootNamespace>Il2CppInspector.Plugin.AzurPromilia</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../Common/Il2CppInspector.Common/Il2CppInspector.Common.csproj" />
+    <PackageReference Include="Iced" Version="1.21.0" />
+    <PackageReference Include="UnicornEngine.Unicorn" Version="$(UnicornPackageVersion)" />
+  </ItemGroup>
+</Project>

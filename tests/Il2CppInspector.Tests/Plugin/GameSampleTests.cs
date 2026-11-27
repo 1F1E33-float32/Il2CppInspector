@@ -7,6 +7,7 @@ internal static class GameSampleTests
 {
     // Decoded table sizes and runtime layouts measured on the shipped samples. A wrong key, record
     // permutation or layout hook changes at least one value. A null baseline prints the measured values.
+    // Multiple lines record independent snapshots for plugins supporting more than one game version.
     private static readonly Dictionary<string, (string Binary, string Baseline)> Samples = new(StringComparer.OrdinalIgnoreCase)
     {
         ["ABC_CN_Windows_0.75.2"] = (
@@ -17,11 +18,23 @@ internal static class GameSampleTests
             "GameAssembly.dll",
             "types=51811 methods=326501 fields=380278 params=285223 literals=38145 typeRefs=133233 methodSpecs=310291 usages=200130 attributes=0 Il2CppClass=0x338 Il2CppClass.static_fields=0xB8 Il2CppClass.vtable_count=0x126 MethodInfo=0x58 MethodInfo.flags=0x4C Il2CppCodeRegistration=0x78 Il2CppMetadataRegistration=0x80"
         ),
+        ["AzurPromilia_xx_Windows_x.x.x"] = (
+            "GameAssembly.dll",
+            "types=52660 methods=435369 fields=291206 params=383754 literals=87088 typeRefs=160602 methodSpecs=789750 usages=498448 attributes=0 Il2CppClass=0x338 Il2CppClass.static_fields=0xB8 Il2CppClass.vtable_count=0x126 MethodInfo=0x58 MethodInfo.flags=0x4C Il2CppCodeRegistration=0x78 Il2CppMetadataRegistration=0x80"
+        ),
         ["BH3_CN_Windows_9.1.0"] = (
             "UserAssembly.dll",
             "types=77799 methods=561798 fields=362445 params=460434 literals=104856 typeRefs=469900 methodSpecs=251755 usages=348209 attributes=41122 Il2CppClass=0xD8 Il2CppClass.static_fields=0x30 Il2CppClass.vtable_count=0xCE MethodInfo=0x40 MethodInfo.flags=0x30 Il2CppCodeRegistration=0x98 Il2CppMetadataRegistration=0xA8"
         ),
-        ["Cy_JP_Windows_x.x.x"] = ("GameAssembly.dll", null),
+        ["Cy_JP_Windows_x.x.x"] = (
+            "GameAssembly.dll",
+            """
+            types=36207 methods=460513 fields=210293 params=334893 literals=34384 typeRefs=97468 methodSpecs=200242 usages=148047 attributes=0 Il2CppClass=0x338 Il2CppClass.static_fields=0xB8 Il2CppClass.vtable_count=0x12A MethodInfo=0x58 MethodInfo.flags=0x4C Il2CppCodeRegistration=0x88 Il2CppMetadataRegistration=0x80
+            types=33829 methods=438125 fields=200288 params=301865 literals=29258 typeRefs=92707 methodSpecs=193327 usages=135535 attributes=0 Il2CppClass=0x338 Il2CppClass.static_fields=0xB8 Il2CppClass.vtable_count=0x12A MethodInfo=0x58 MethodInfo.flags=0x4C Il2CppCodeRegistration=0x88 Il2CppMetadataRegistration=0x80
+            types=56802 methods=353832 fields=275245 params=321692 literals=52776 typeRefs=143621 methodSpecs=257342 usages=219686 attributes=0 Il2CppClass=0x338 Il2CppClass.static_fields=0xB8 Il2CppClass.vtable_count=0x12A MethodInfo=0x58 MethodInfo.flags=0x4C Il2CppCodeRegistration=0x88 Il2CppMetadataRegistration=0x80
+            types=56835 methods=354090 fields=275499 params=321902 literals=52815 typeRefs=143677 methodSpecs=257389 usages=219795 attributes=0 Il2CppClass=0x338 Il2CppClass.static_fields=0xB8 Il2CppClass.vtable_count=0x12A MethodInfo=0x58 MethodInfo.flags=0x4C Il2CppCodeRegistration=0x88 Il2CppMetadataRegistration=0x80
+            """
+        ),
         ["Endfield_CN_Android_x.x.x"] = ("libil2cpp.so", null),
         ["Endfield_CN_Windows_1.6.3"] = (
             "GameAssembly.dll",
@@ -126,8 +139,11 @@ internal static class GameSampleTests
         );
         if (baseline == null)
             throw new InvalidOperationException($"{gameId} has no baseline. Measured: {measured}");
-        var mismatches = measured.Split(' ').Except(baseline.Split(' '));
-        Check(!mismatches.Any(), $"{gameId} decoded tables and runtime layouts match the baseline {string.Join(" ", mismatches)}".TrimEnd());
+        var measuredValues = measured.Split(' ').ToHashSet(StringComparer.Ordinal);
+        var matches = baseline
+            .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Any(expected => measuredValues.SetEquals(expected.Split(' ')));
+        Check(matches, $"{gameId} decoded tables and runtime layouts match a recorded baseline: {measured}");
 
         if (output == null)
             return;
@@ -150,7 +166,8 @@ internal static class GameSampleTests
     {
         using var resolver = new RegisteredAssemblyResolver();
         var parameters = new Cecil.ReaderParameters { AssemblyResolver = resolver };
-        var assemblies = Directory.GetFiles(directory, "*.dll").Select(f => Cecil.AssemblyDefinition.ReadAssembly(f, parameters)).ToList();
+        // IL2CPP image names can omit the .dll suffix (for example, dynamically generated assemblies).
+        var assemblies = Directory.GetFiles(directory).Select(f => Cecil.AssemblyDefinition.ReadAssembly(f, parameters)).ToList();
         foreach (var assembly in assemblies)
             resolver.Register(assembly);
         var unresolved = assemblies
