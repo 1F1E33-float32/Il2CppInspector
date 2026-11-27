@@ -22,7 +22,7 @@ namespace Il2CppInspector.Outputs
          * The better array size type is a union of the actual size (int32_t) and the actual value (uintptr_t) which should hopefully improve decompilation.
          */
         private readonly bool _useBetterArraySize =
-            model.UnityVersion.CompareTo("2017.2.1") >= 0 && model.Package.BinaryImage.Bits == 64 && useBetterArraySize;
+            useBetterArraySize && model.Package.BinaryImage.Bits == 64 && model.RuntimeCppTypes.GetType("il2cpp_array_size_t").SizeBytes == 8;
 
         private StreamWriter _writer;
         private PhasedProgress _progress;

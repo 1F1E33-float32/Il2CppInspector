@@ -21,6 +21,7 @@ public partial record struct Il2CppCodeGenModule
     [VersionCondition(GreaterThanOrEqual = "27.1")]
     public Pointer<Il2CppTokenAdjustorThunkPair> AdjustorThunks;
 
+    [VersionCondition(LessThan = "108.0")]
     public PrimitivePointer<int> InvokerIndices; // int*
 
     [NativeInteger]
@@ -29,11 +30,17 @@ public partial record struct Il2CppCodeGenModule
     public Pointer<Il2CppTokenIndexMethodTuple> ReversePInvokeWrapperIndices;
 
     [NativeInteger]
+    [VersionCondition(LessThan = "108.0")]
     public uint RgctxRangesCount;
+
+    [VersionCondition(LessThan = "108.0")]
     public Pointer<Il2CppTokenRangePair> RgctxRanges;
 
     [NativeInteger]
+    [VersionCondition(LessThan = "108.0")]
     public uint RgctxsCount;
+
+    [VersionCondition(LessThan = "108.0")]
     public Pointer<Il2CppRgctxDefinition> Rgctxs;
 
     public PrimitivePointer<byte> DebuggerMetadata; // Pointer<Il2CppDebuggerMetadataRegistration> DebuggerMetadata;
@@ -44,7 +51,7 @@ public partial record struct Il2CppCodeGenModule
     [VersionCondition(GreaterThanOrEqual = "27.0")]
     public Il2CppMethodPointer ModuleInitializer;
 
-    [VersionCondition(GreaterThanOrEqual = "27.0")]
+    [VersionCondition(GreaterThanOrEqual = "27.0", LessThan = "108.0")]
     public PrimitivePointer<int> StaticConstructorTypeIndices; // TypeDefinitionIndex*
 
     [VersionCondition(GreaterThanOrEqual = "27.0")]

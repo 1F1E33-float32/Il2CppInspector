@@ -7,6 +7,7 @@
 */
 
 using Il2CppInspector.Next;
+using Il2CppInspector.Next.Metadata;
 
 namespace Il2CppInspector
 {
@@ -40,7 +41,7 @@ namespace Il2CppInspector
         {
             uint index;
             MetadataUsageType usageType;
-            if (package.Version < MetadataVersions.V190)
+            if (package.Version < MetadataVersions.V180)
             {
                 /* These encoded indices appear only in vtables, and are decoded by IsGenericMethodIndex/GetDecodedMethodIndex */
                 var isGeneric = encodedIndex & 0x80000000;
@@ -49,14 +50,9 @@ namespace Il2CppInspector
             }
             else
             {
-                /* These encoded indices appear in metadata usages, and are decoded by GetEncodedIndexType/GetDecodedMethodIndex */
-                var encodedType = encodedIndex & 0xE0000000;
-                usageType = (MetadataUsageType)(encodedType >> 29);
-                index = encodedIndex & 0x1FFFFFFF;
-
-                // From v27 the bottom bit is set to indicate the usage token hasn't been replaced with a pointer at runtime yet
-                if (package.Version >= MetadataVersions.V270)
-                    index >>= 1;
+                var decoded = Il2CppMetadataUsage.FromValue(package.Version, encodedIndex);
+                usageType = (MetadataUsageType)decoded.Type;
+                index = decoded.Index;
             }
             return new MetadataUsage(usageType, (int)index, virtualAddress);
         }

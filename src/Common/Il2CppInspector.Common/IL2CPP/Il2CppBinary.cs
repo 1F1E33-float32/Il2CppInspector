@@ -207,7 +207,7 @@ namespace Il2CppInspector
 
             if (symbols.Any())
             {
-                Console.WriteLine($"Symbol table(s) found with {symbols.Count} entries");
+                AnalysisLog.WriteLine($"Symbol table(s) found with {symbols.Count} entries");
 
                 symbols.TryGetValue("g_CodeRegistration", out var code);
                 symbols.TryGetValue("g_MetadataRegistration", out var metadata);
@@ -219,17 +219,17 @@ namespace Il2CppInspector
 
                 if (code != null && metadata != null)
                 {
-                    Console.WriteLine("Required structures acquired from symbol lookup");
+                    AnalysisLog.WriteLine("Required structures acquired from symbol lookup");
                     return (code.VirtualAddress, metadata.VirtualAddress);
                 }
                 else
                 {
-                    Console.WriteLine("No matches in symbol table");
+                    AnalysisLog.WriteLine("No matches in symbol table");
                 }
             }
             else
             {
-                Console.WriteLine("No symbol table present in binary file");
+                AnalysisLog.WriteLine("No symbol table present in binary file");
             }
             return null;
         }
@@ -249,7 +249,7 @@ namespace Il2CppInspector
                 if (code != 0)
                 {
                     RegistrationFunctionPointer = loc + Image.GlobalOffset;
-                    Console.WriteLine(
+                    AnalysisLog.WriteLine(
                         "Required structures acquired from code heuristics. Initialization function: 0x{0:X16}",
                         RegistrationFunctionPointer
                     );
@@ -257,7 +257,7 @@ namespace Il2CppInspector
                 }
             }
 
-            Console.WriteLine("No matches via code heuristics");
+            AnalysisLog.WriteLine("No matches via code heuristics");
             return null;
         }
 
@@ -271,11 +271,11 @@ namespace Il2CppInspector
             var (codePtr, metadataPtr) = ImageScan(Metadata);
             if (codePtr == 0)
             {
-                Console.WriteLine("No matches via data heuristics");
+                AnalysisLog.WriteLine("No matches via data heuristics");
                 return null;
             }
 
-            Console.WriteLine("Required structures acquired from data heuristics");
+            AnalysisLog.WriteLine("Required structures acquired from data heuristics");
             return (codePtr, metadataPtr);
         }
 
@@ -304,12 +304,12 @@ namespace Il2CppInspector
 
             var pointerSize = Image.Bits == 32 ? 4u : 8u;
 
-            Console.WriteLine(
+            AnalysisLog.WriteLine(
                 "CodeRegistration struct found at 0x{0:X16} (file offset 0x{1:X8})",
                 Image.Bits == 32 ? codeRegistration & 0xffff_ffff : codeRegistration,
                 Image.MapVATR(codeRegistration)
             );
-            Console.WriteLine(
+            AnalysisLog.WriteLine(
                 "MetadataRegistration struct found at 0x{0:X16} (file offset 0x{1:X8})",
                 Image.Bits == 32 ? metadataRegistration & 0xffff_ffff : metadataRegistration,
                 Image.MapVATR(metadataRegistration)
@@ -318,6 +318,9 @@ namespace Il2CppInspector
             // Root structures from which we find everything else
             CodeRegistration = Image.ReadMappedVersionedObject<Il2CppCodeRegistration>(codeRegistration);
             MetadataRegistration = Image.ReadMappedVersionedObject<Il2CppMetadataRegistration>(metadataRegistration);
+
+            if (_validatingMetadataVersion)
+                ValidateRegistrationForVersionDetection();
 
             StatusUpdate($"Analyzing IL2CPP data for {Image.Format}/{Image.Arch} image");
 
@@ -351,7 +354,7 @@ namespace Il2CppInspector
 
                 // In v24.3, windowsRuntimeFactoryTable collides with codeGenModules. So far no samples have had windowsRuntimeFactoryCount > 0;
                 // if this changes we'll have to get smarter about disambiguating these two.
-                if (CodeRegistration.CodeGenModulesCount == 0)
+                if (Image.Version == MetadataVersions.V242 && CodeRegistration.CodeGenModulesCount == 0)
                 {
                     Image.Version = MetadataVersions.V243;
                     CodeRegistration = Image.ReadMappedVersionedObject<Il2CppCodeRegistration>(codeRegistration);
@@ -393,7 +396,15 @@ namespace Il2CppInspector
                     }
 
                     // Read method invoker pointer indices - one per method
-                    if (module.InvokerIndices != 0 && Image.TryMapVATR(module.InvokerIndices, out _))
+                    if (Image.Version >= MetadataVersions.V1080)
+                    {
+                        var imageDefinition = Metadata.Images.Single(i => Metadata.Strings[i.NameIndex] == name);
+                        MethodInvokerIndices.Add(
+                            module,
+                            Metadata.ReadInvokerIndices(imageDefinition, module.MethodPointerCount, CodeRegistration.InvokerPointersCount)
+                        );
+                    }
+                    else if (module.InvokerIndices != 0 && Image.TryMapVATR(module.InvokerIndices, out _))
                     {
                         try
                         {
@@ -439,6 +450,22 @@ namespace Il2CppInspector
 
             // Type references (pointer array)
             var typeRefPointers = Image.ReadMappedUWordArray(MetadataRegistration.Types, (int)MetadataRegistration.TypesCount);
+            // Unity 2021.1 adds Il2CppType::valuetype at bit 31 and moves byref/pinned down one bit.
+            // A metadata definition's by-value type is never pinned, so a value type distinguishes 27.2 from 27.1.
+            if (Image.Version == MetadataVersions.V271)
+            {
+                foreach (var definition in Metadata.Types)
+                {
+                    if (!definition.Bitfield.ValueType)
+                        continue;
+                    if ((uint)(int)definition.ByValTypeIndex >= typeRefPointers.Length)
+                        throw new InvalidDataException("Il2CppTypeDefinition.byvalTypeIndex is outside the registered type table.");
+                    var bits = Image.ReadMappedPrimitive<uint>(typeRefPointers[definition.ByValTypeIndex] + (ulong)Image.Bits / 8);
+                    if ((bits & 0x80000000) != 0)
+                        Image.Version = MetadataVersions.V272;
+                    break;
+                }
+            }
             TypeReferenceIndicesByAddress = typeRefPointers
                 .Zip(Enumerable.Range(0, typeRefPointers.Length), (a, i) => new { a, i })
                 .ToDictionary(x => x.a, x => x.i);
@@ -516,7 +543,7 @@ namespace Il2CppInspector
             // >=22: unresolvedVirtualCallPointers
             // >=23: interopData
 
-            if (Image.Version < MetadataVersions.V190)
+            if (Image.Version < MetadataVersions.V180)
             {
                 VTableMethodReferences = Image.ReadMappedPrimitiveArray<uint>(
                     MetadataRegistration.MethodReferences,
@@ -525,10 +552,10 @@ namespace Il2CppInspector
             }
 
             // Generic type and method specs (open and closed constructed types)
-            MethodSpecs = Image.ReadMappedVersionedObjectArray<Il2CppMethodSpec>(
-                MetadataRegistration.MethodSpecs,
-                (int)MetadataRegistration.MethodSpecsCount
-            );
+            MethodSpecs =
+                Image.Version >= MetadataVersions.V1080
+                    ? Metadata.ReadMethodSpecs(MetadataRegistration.GenericInstsCount)
+                    : Image.ReadMappedVersionedObjectArray<Il2CppMethodSpec>(MetadataRegistration.MethodSpecs, MetadataRegistration.MethodSpecsCount);
 
             // Concrete generic class and method signatures
             GenericInstances = Image.ReadMappedVersionedObjectPointerArray<Il2CppGenericInst>(
@@ -541,13 +568,21 @@ namespace Il2CppInspector
                 CodeRegistration.GenericMethodPointers,
                 (int)CodeRegistration.GenericMethodPointersCount
             );
-            var genericMethodTable = Image.ReadMappedVersionedObjectArray<Il2CppGenericMethodFunctionsDefinitions>(
-                MetadataRegistration.GenericMethodTable,
-                (int)MetadataRegistration.GenericMethodTableCount
-            );
+            var genericMethodTable =
+                Image.Version >= MetadataVersions.V1080
+                    ? Metadata.ReadGenericMethodTable(
+                        MethodSpecs.Length,
+                        CodeRegistration.GenericMethodPointersCount,
+                        CodeRegistration.InvokerPointersCount
+                    )
+                    : Image.ReadMappedVersionedObjectArray<Il2CppGenericMethodFunctionsDefinitions>(
+                        MetadataRegistration.GenericMethodTable,
+                        MetadataRegistration.GenericMethodTableCount
+                    );
             foreach (var tableEntry in genericMethodTable)
             {
-                GenericMethodPointers.Add(MethodSpecs[tableEntry.GenericMethodIndex], genericMethodPointers[tableEntry.Indices.MethodIndex]);
+                if (tableEntry.Indices.MethodIndex >= 0)
+                    GenericMethodPointers.Add(MethodSpecs[tableEntry.GenericMethodIndex], genericMethodPointers[tableEntry.Indices.MethodIndex]);
                 GenericMethodInvokerIndices.Add(MethodSpecs[tableEntry.GenericMethodIndex], tableEntry.Indices.InvokerIndex);
             }
 

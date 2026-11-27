@@ -109,13 +109,13 @@ namespace Il2CppInspector.Cpp
             var rgxDefinition = new Regex(@"^(typedef\s+)?(struct|union|enum)");
             var rgxFieldFnPtr = new Regex(CppFnPtrType.Regex + @";");
             var rgxField = new Regex(
-                @"^((?:(?:const|volatile|unsigned|signed|struct|enum)\s+)*(?:long\s+)?\S+?\s*(?:\*\s*(?:(?:const|volatile)\s*)?)*)\s*((?:\S|\s*,\s*)+)(?:\s*:\s*([0-9]+))?;"
+                @"^((?:(?:const|volatile|unsigned|signed|struct|enum)\s+)*(?:long\s+)?\S+?\s*(?:\*\s*(?:(?:const|volatile)\s*)?)*)\s*((?:\S|\s*,\s*|\s+(?=\[))+)(?:\s*:\s*([0-9]+))?;"
             );
             var rgxEnumValue = new Regex(@"^\s*([A-Za-z0-9_]+)(?:\s*=\s*(.+?))?,?\s*$");
 
             var rgxCompressPtrs = new Regex(@"\*\s+\*");
 
-            var rgxArrayField = new Regex(@"(\S+?)\[([0-9]+)\]");
+            var rgxArrayField = new Regex(@"(\S+?)\s*\[([0-9]+)\]");
 
             var rgxAlignment = new Regex(@"__attribute__\(\(aligned\(([0-9]+)\)\)\)\s+");
             var rgxIsBitDirective = new Regex(@"#ifdef\s+IS_(32|64)BIT");

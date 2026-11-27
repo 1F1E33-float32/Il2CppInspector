@@ -464,12 +464,13 @@ public class CppDeclarationGenerator
         var name = TypeNamer.GetName(ti);
         var namer = CreateNamespace().MakeNamer<int>((i) => vtable[i]?.Name?.ToCIdentifier() ?? "__unknown");
 
-        // Il2Cpp switched to `VirtualInvokeData *vtable` in Unity 5.3.6.
-        // Previous versions used `MethodInfo **vtable`.
+        // Unity 5.3.5p3 changes MethodInfo** to VirtualInvokeData*; the 5.4 beta branch changes separately.
         // TODO: Consider adding function types. This considerably increases the script size
         // but can significantly help with reverse-engineering certain binaries.
         var vtableStruct = types.Struct(name + "__VTable");
-        var slotType = UnityVersion.CompareTo("5.3.6") < 0 ? "MethodInfo *" : "VirtualInvokeData";
+        var slotType = types.GetComplexType("Il2CppClass")["vtable"].Type is CppPointerType { ElementType: CppPointerType }
+            ? "MethodInfo *"
+            : "VirtualInvokeData";
         for (int i = 0; i < vtable.Length; i++)
             types.AddField(vtableStruct, namer.GetName(i), slotType);
         return vtableStruct;
@@ -496,7 +497,7 @@ public class CppDeclarationGenerator
         var cls = types.Struct(name + "__Class");
         types.AddField(cls, "_0", "Il2CppClass_0");
 
-        if (UnityVersion.CompareTo("5.5.0") < 0)
+        if (types.GetComplexType("Il2CppClass")["vtable"].Type is CppPointerType)
         {
             cls.AddField("vtable", vtable.AsPointer(types.WordSize));
             types.AddField(cls, "interfaceOffsets", "Il2CppRuntimeInterfaceOffsetPair *");
@@ -506,7 +507,11 @@ public class CppDeclarationGenerator
         }
         else
         {
-            types.AddField(cls, "interfaceOffsets", "Il2CppRuntimeInterfaceOffsetPair *");
+            // Unity 6000.6 merges implementedInterfaces and interfaceOffsets into Il2CppRuntimeInterfaceData.
+            if (types.GetComplexType("Il2CppClass")["interfaces"] != null)
+                types.AddField(cls, "interfaces", "Il2CppRuntimeInterfaceData *");
+            else
+                types.AddField(cls, "interfaceOffsets", "Il2CppRuntimeInterfaceOffsetPair *");
             cls.AddField("static_fields", statics.AsPointer(types.WordSize));
             types.AddField(cls, "rgctx_data", "Il2CppRGCTXData *", true);
             types.AddField(cls, "_1", "Il2CppClass_1");

@@ -31,5 +31,21 @@ public partial record struct Il2CppImageDefinition
     [VersionCondition(GreaterThanOrEqual = "24.1")]
     public uint CustomAttributeCount { get; internal set; }
 
+    [VersionCondition(GreaterThanOrEqual = "108.0")]
+    public uint InvokerIndicesStart { get; internal set; }
+
+    [VersionCondition(GreaterThanOrEqual = "108.0")]
+    public uint RgctxRangesStart { get; internal set; }
+
+    [VersionCondition(GreaterThanOrEqual = "108.0")]
+    public uint RgctxRangesCount { get; internal set; }
+
+    // MetadataDeserialization::DeserializeImageDefinition serializes this offset with the TypeDefinitionIndex width.
+    [VersionCondition(GreaterThanOrEqual = "108.0")]
+    public TypeDefinitionIndex StaticConstructorStart { get; internal set; }
+
+    [VersionCondition(GreaterThanOrEqual = "108.0")]
+    public uint StaticConstructorCount { get; internal set; }
+
     public readonly bool IsValid => NameIndex != 0;
 }

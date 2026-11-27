@@ -38,6 +38,7 @@ internal sealed class PhasedProgress(string label, Action<OperationProgress> cal
 
     public void Step()
     {
+        AnalysisLog.CheckCancellation();
         if (_done >= _steps)
             return;
         _done++;
@@ -58,6 +59,7 @@ internal sealed class PhasedProgress(string label, Action<OperationProgress> cal
 
     private void Report(bool force)
     {
+        AnalysisLog.CheckCancellation();
         if (callback == null)
             return;
         var position = _start + (_steps > 0 ? _weight * _done / _steps : 0);

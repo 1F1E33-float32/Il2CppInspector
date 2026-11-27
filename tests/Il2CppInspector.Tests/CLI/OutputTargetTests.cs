@@ -12,6 +12,10 @@ internal static class OutputTargetTests
             RunCli(["-t", "missing", "-t", "Debug"]).Contains("Unknown output target: missing"),
             "A later target cannot hide an earlier invalid target"
         );
+        Check(
+            RunCli(["--unity-version", "2022.3.5b1"]).Contains("only final (f) and patch (p) releases are supported"),
+            "CLI rejects a prerelease override before loading input files, including when no script target is selected"
+        );
 
         string RunCli(string[] targets)
         {

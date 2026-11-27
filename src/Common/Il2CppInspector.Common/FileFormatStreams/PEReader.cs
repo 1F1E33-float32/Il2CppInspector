@@ -100,7 +100,7 @@ namespace Il2CppInspector
             // Unpacking must be done starting here, one byte after the end of the headers
             // Packed or previously packed with Themida? This is purely for information
             if (sections.Any(x => x.Name == ".themida"))
-                Console.WriteLine("Themida protection detected");
+                AnalysisLog.WriteLine("Themida protection detected");
 
             // Rename sections if needed (before potentially searching them or rewriting them to the stream)
             foreach (var section in sections.Where(s => wantedSectionTypes.ContainsKey(s.Characteristics)))

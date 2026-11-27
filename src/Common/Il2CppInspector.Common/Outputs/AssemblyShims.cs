@@ -279,7 +279,7 @@ namespace Il2CppInspector.Outputs
 
         private void GetBuiltinAttributes()
         {
-            if (model.Package.Version >= MetadataVersions.V1040)
+            if (model.Package.Version >= MetadataVersions.V1060)
             {
                 inlineArrayAttribute = model.TypesByFullName.GetValueOrDefault("System.Runtime.CompilerServices.InlineArrayAttribute");
             }
@@ -424,7 +424,7 @@ namespace Il2CppInspector.Outputs
             if (type.Definition.IsValid)
                 mType.AddAttribute(module, tokenAttribute, ("Token", $"0x{type.MetadataToken:X8}"));
 
-            if (model.Package.Version >= MetadataVersions.V1040)
+            if (model.Package.Version >= MetadataVersions.V1060)
             {
                 // L-TODO: Verify if we actually need to add the attribute ourselves; it might just be preserved
                 if (type.HasInlineArray && inlineArrayAttribute != null)

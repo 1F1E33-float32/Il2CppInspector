@@ -19,7 +19,7 @@ public interface IIndexType<T>
     private static int GetSizeFromTag(in StructVersion version)
     {
         // Fallback to the default for unsupported configurations.
-        if (version < MetadataVersions.V380 || version.Tag == null)
+        if (version < MetadataVersions.V390 || version.Tag == null)
         {
             return sizeof(int);
         }

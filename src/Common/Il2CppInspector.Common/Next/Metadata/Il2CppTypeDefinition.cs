@@ -43,7 +43,7 @@ public partial record struct Il2CppTypeDefinition
     [VersionCondition(LessThanOrEqual = "22.0")]
     public int MarshalingFunctionsIndex { get; internal set; }
 
-    [VersionCondition(GreaterThanOrEqual = "21.0", LessThanOrEqual = "22.0")]
+    [VersionCondition(GreaterThanOrEqual = "20.1", LessThanOrEqual = "22.0")]
     public int CcwFunctionIndex { get; internal set; }
 
     [VersionCondition(GreaterThanOrEqual = "21.0", LessThanOrEqual = "22.0")]
@@ -76,5 +76,5 @@ public partial record struct Il2CppTypeDefinition
 
     public readonly bool IsValid => NameIndex != 0;
 
-    public int GetEnumElementTypeIndex(StructVersion version) => version >= MetadataVersions.V350 ? ParentIndex : ElementTypeIndex;
+    public int GetEnumElementTypeIndex(StructVersion version) => version >= MetadataVersions.V390 ? ParentIndex : ElementTypeIndex;
 }

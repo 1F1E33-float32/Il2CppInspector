@@ -5,7 +5,7 @@
 #else
 #define IS_32BIT
 #endif
-#include "Cpp/UnityHeaders/39-6000.3.0b1.h"
+#include "Cpp/UnityHeaders/39-6000.3.0f1-6000.3.2f1.h"
 
 struct Tail { void* pointer; uint8_t byte; };
 struct Nested { uint8_t byte; Tail value; uint32_t after; };

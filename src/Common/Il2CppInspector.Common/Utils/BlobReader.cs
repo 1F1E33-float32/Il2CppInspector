@@ -128,7 +128,7 @@ public static class BlobReader
                 }
                 catch (InvalidDataException)
                 {
-                    Console.WriteLine($"Found invalid compressed int at metadata address 0x{address:x8}. Reading as normal int.");
+                    AnalysisLog.WriteLine($"Found invalid compressed int at metadata address 0x{address:x8}. Reading as normal int.");
                     return blob.ReadInt32(address);
                 }
             }
@@ -148,7 +148,7 @@ public static class BlobReader
                 }
                 catch (InvalidDataException)
                 {
-                    Console.WriteLine($"Found invalid compressed uint at metadata address 0x{address:x8}. Reading as normal uint.");
+                    AnalysisLog.WriteLine($"Found invalid compressed uint at metadata address 0x{address:x8}. Reading as normal uint.");
                     return blob.ReadUInt32(address);
                 }
             }

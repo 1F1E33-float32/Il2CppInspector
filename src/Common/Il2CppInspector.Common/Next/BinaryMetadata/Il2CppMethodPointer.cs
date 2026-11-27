@@ -3,14 +3,13 @@ using VersionedSerialization.Attributes;
 namespace Il2CppInspector.Next.BinaryMetadata;
 
 [VersionedStruct]
-public partial record struct Il2CppMethodPointer(ulong addr = 0)
+public partial record struct Il2CppMethodPointer
 {
-    public static readonly Il2CppMethodPointer Null = new();
-
     [NativeInteger]
-    public ulong Value { get; set; } = addr;
+    public ulong Value { get; set; }
 
-    public readonly bool IsNull => Value == 0;
+    // A positional record parameter would add a second serialized property alongside Value.
+    public Il2CppMethodPointer(ulong addr) => Value = addr;
 
     public override readonly string ToString() => $"0x{Value:X}";
 

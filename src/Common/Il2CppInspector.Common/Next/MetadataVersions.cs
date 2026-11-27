@@ -4,9 +4,13 @@ namespace Il2CppInspector.Next;
 
 public static class MetadataVersions
 {
-    public static readonly StructVersion V160 = new(16);
+    // Unity 5.3.1p1-p2 introduces metadata usages before adding TypeDef/Image tokens in version 19.
+    public static readonly StructVersion V180 = new(18);
 
     public static readonly StructVersion V190 = new(19);
+
+    // Unity 5.3.4p1 adds CCW indices before the metadata version changes to 21.
+    public static readonly StructVersion V201 = new(20, 1);
 
     public static readonly StructVersion V210 = new(21);
     public static readonly StructVersion V220 = new(22);
@@ -17,6 +21,8 @@ public static class MetadataVersions
     public static readonly StructVersion V243 = new(24, 3);
     public static readonly StructVersion V244 = new(24, 4);
     public static readonly StructVersion V245 = new(24, 5);
+
+    public const string Tag2018 = "2018"; // Unity 2018.4.18+ backports the Windows Runtime factory table to 24.1.
 
     public static readonly StructVersion V270 = new(27);
     public static readonly StructVersion V271 = new(27, 1);
@@ -29,32 +35,15 @@ public static class MetadataVersions
     // No tag - 29.0/31.0
     public const string Tag2022 = "2022"; // 29.1/31.1
 
-    // Unity 6000.3.0a2
-    public static readonly StructVersion V350 = new(35);
-
-    // Unity 6000.3.0a5
-    public static readonly StructVersion V380 = new(38);
-
-    // NOTE: This version uses tags to specify the size of TypeIndex, TypeDefinitionIndex, and GenericContainerIndex.
-
-    // Unity 6000.3.0b1
+    // Unity 6000.3.0f1 uses section descriptors and tags for TypeIndex, TypeDefinitionIndex,
+    // GenericContainerIndex and ParameterIndex widths.
     public static readonly StructVersion V390 = new(39);
 
-    // NOTE: This version additionally uses a tag to specify the size of ParameterIndex.
-
-    // Unity 6000.5.0a3
-    public static readonly StructVersion V1040 = new(104);
-
-    // NOTE: This version additionally uses tags to specify the size of InterfaceIndex, EventIndex, PropertyIndex, NestedTypeIndex,
-    // alongside a new metadata section for Il2CppInlineArrayLength and a bitfield flag indicating an inline array.
-
-    // Unity 6000.5.0a5
-    public static readonly StructVersion V1050 = new(105);
-
-    // NOTE: This version additionally uses a tag to specify the size of MethodIndex.
-
-    // Unity 6000.5.0a6
+    // Unity 6000.5.0f1 adds inline arrays, compact generic containers and tags for the remaining index widths:
+    // InterfacesIndex, EventIndex, PropertyIndex, NestedTypeIndex, MethodIndex, GenericParameterIndex,
+    // FieldIndex and DefaultValueDataIndex.
     public static readonly StructVersion V1060 = new(106);
-    // NOTE: This version additionally uses tags to specify the size of GenericParameterIndex, FieldIndex, DefaultValueDataIndex,
-    // alongside changing TypeArgc to a ushort and IsMethod to a byte in Il2CppGenericContainer.
+
+    // Unity 6000.6.0f1 stores generic method tables, invoker indices and RGCTX in global metadata.
+    public static readonly StructVersion V1080 = new(108);
 }

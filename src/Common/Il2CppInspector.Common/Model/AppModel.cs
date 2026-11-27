@@ -105,9 +105,15 @@ namespace Il2CppInspector.Model
                         LinkageName = m.ToMangledString(),
                     });
             foreach (var method in nativeMethods)
+            {
+                AnalysisLog.CheckCancellation();
                 yield return method;
+            }
             foreach (var method in EnumerateNativeSupportMethods())
+            {
+                AnalysisLog.CheckCancellation();
                 yield return method;
+            }
         }
 
         internal IEnumerable<NativeMethod> EnumerateNativeSupportMethods()
@@ -154,13 +160,20 @@ namespace Il2CppInspector.Model
         {
             var declaration =
                 Package.Metadata.HasGameAdapter ? Package.Metadata.GamePlugin.RegistrationSignature
-                : UnityVersion.CompareTo("5.3.5") >= 0
+                : Package.Version >= MetadataVersions.V210
                     ? "void (*il2cpp_codegen_register)(const Il2CppCodeRegistration* codeRegistration, const Il2CppMetadataRegistration* metadataRegistration, const Il2CppCodeGenOptions* codeGenOptions)"
                 : "void (*il2cpp_codegen_register)(const Il2CppCodeRegistration* codeRegistration, const Il2CppMetadataRegistration* metadataRegistration)";
             return CppFnPtrType.FromSignature(RuntimeCppTypes, declaration);
         }
 
-        public IEnumerable<CppType> EnumerateNativeTypes() => gameAnalysis?.EnumerateNativeTypes() ?? cppTypeCollection.Types.Values;
+        public IEnumerable<CppType> EnumerateNativeTypes()
+        {
+            foreach (var type in gameAnalysis?.EnumerateNativeTypes() ?? cppTypeCollection.Types.Values)
+            {
+                AnalysisLog.CheckCancellation();
+                yield return type;
+            }
+        }
 
         // Plugin analysis is built on first use. An exporter plans and runs the parts it uses inside its own progress, so the
         // lazy build is reported there; stock models are fully built by Build and need nothing here.
@@ -179,13 +192,13 @@ namespace Il2CppInspector.Model
         // All of the string literals in the IL2CPP binary
         // Note: Does not include string literals from global-metadata.dat
         // Note: The virtual addresses are of String* (VAs of the pointer to String*) objects, not the strings themselves
-        // For il2cpp < 19, the key is the string literal ordinal instead of the address
+        // For il2cpp < 18, the key is the string literal ordinal instead of the address
         public Dictionary<ulong, string> Strings { get; } = [];
 
         public Dictionary<ulong, (FieldInfo Field, string Value)> Fields { get; } = [];
         public Dictionary<ulong, (FieldInfo Field, string Value)> FieldRvas { get; } = [];
 
-        public bool StringIndexesAreOrdinals => Package.Version < MetadataVersions.V190;
+        public bool StringIndexesAreOrdinals => Package.Version < MetadataVersions.V180;
 
         // The .NET type model for the application
         public TypeModel TypeModel { get; }
@@ -295,10 +308,7 @@ namespace Il2CppInspector.Model
             }
             progress.Begin("Unity headers");
 
-            // Silent operation if requested
-            var stdout = Console.Out;
-            if (silent)
-                Console.SetOut(new StreamWriter(Stream.Null));
+            using var log = silent ? new AnalysisLog(null) : null;
 
             // Reset in case this is not the first build
             gameAnalysis = null;
@@ -321,14 +331,17 @@ namespace Il2CppInspector.Model
                 : UnityHeaders.GuessHeadersForBinary(TypeModel.Package.Binary).Last();
             UnityVersion = unityVersion ?? UnityHeaders.VersionRange.Min;
 
-            Console.WriteLine(
+            AnalysisLog.WriteLine(
                 $"Selected Unity version(s) {UnityHeaders.VersionRange} (types: {UnityHeaders.TypeHeaderResource.VersionRange}, APIs: {UnityHeaders.APIHeaderResource.VersionRange})"
             );
 
             // Check for matching metadata and binary versions
-            if (UnityHeaders.MetadataVersion != Image.Version)
+            if (
+                UnityHeaders.MetadataVersion != Image.Version
+                || UnityHeaders.MetadataVersion.HasTag(MetadataVersions.Tag2022) != Image.Version.HasTag(MetadataVersions.Tag2022)
+            )
             {
-                Console.WriteLine(
+                AnalysisLog.WriteLine(
                     $"Warning: selected version {UnityVersion} (metadata version {UnityHeaders.MetadataVersion})"
                         + $" does not match metadata version {Image.Version}."
                 );
@@ -363,7 +376,6 @@ namespace Il2CppInspector.Model
                 progress.Begin("Native names");
                 gameAnalysis = Package.Metadata.GamePlugin.CreateAnalysisModel(this);
                 progress.End();
-                Console.SetOut(stdout);
                 return this;
             }
 
@@ -389,7 +401,7 @@ namespace Il2CppInspector.Model
             BuildMetadataDataUsages(progress);
 
             // Add types from metadata usage list to C++ type model
-            // Not supported in il2cpp <19
+            // Not supported in il2cpp <18
             Group = "types_from_usages";
 
             progress.Begin("Types from usages", usageCount);
@@ -443,10 +455,10 @@ namespace Il2CppInspector.Model
                     }
                 }
 
-            // Add string literals for metadata <19 to the model
-            if (Package.Version < MetadataVersions.V190)
+            // Add string literals for metadata <18 to the model
+            if (Package.Version < MetadataVersions.V180)
             {
-                /* Version < 19 calls `il2cpp_codegen_string_literal_from_index` to get string literals.
+                /* Version < 18 calls `il2cpp_codegen_string_literal_from_index` to get string literals.
                  * Unfortunately, metadata references are just loose globals in Il2CppMetadataUsage.cpp
                  * so we can't automatically name those. Next best thing is to define an enum for the strings. */
                 for (var i = 0; i < Package.StringLiterals.Length; i++)
@@ -473,9 +485,6 @@ namespace Il2CppInspector.Model
 
             RequiredForwardDefinitions = declarationGenerator.GenerateRequiredForwardDefinitions();
             progress.End();
-
-            // Restore stdout
-            Console.SetOut(stdout);
 
             // This is to allow this method to be chained after a new expression
             return this;
@@ -601,7 +610,7 @@ namespace Il2CppInspector.Model
         // We only include support for Unity 5.5.0 onwards
         public int GetVTableIndexFromClassOffset(int offset)
         {
-            if (UnityVersion.CompareTo("5.5.0") < 0)
+            if (RuntimeCppTypes.GetComplexType("Il2CppClass")["vtable"].Type is CppPointerType)
                 throw new NotImplementedException("VTable index resolution is only supported for Unity 5.5.0 and later");
 
             // VirtualInvokeData has two members. The first is the jump target.

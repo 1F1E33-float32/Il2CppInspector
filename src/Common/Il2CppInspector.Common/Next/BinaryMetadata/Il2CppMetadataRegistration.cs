@@ -20,8 +20,10 @@ public partial record struct Il2CppMetadataRegistration
     public Pointer<Pointer<Il2CppGenericInst>> GenericInsts;
 
     [NativeInteger]
+    [VersionCondition(LessThan = "108.0")]
     public int GenericMethodTableCount;
 
+    [VersionCondition(LessThan = "108.0")]
     public Pointer<Il2CppGenericMethodFunctionsDefinitions> GenericMethodTable;
 
     [NativeInteger]
@@ -30,8 +32,10 @@ public partial record struct Il2CppMetadataRegistration
     public Pointer<Pointer<Il2CppType>> Types;
 
     [NativeInteger]
+    [VersionCondition(LessThan = "108.0")]
     public int MethodSpecsCount;
 
+    [VersionCondition(LessThan = "108.0")]
     public Pointer<Il2CppMethodSpec> MethodSpecs;
 
     [NativeInteger]
@@ -51,9 +55,16 @@ public partial record struct Il2CppMetadataRegistration
     public Pointer<Pointer<Il2CppTypeDefinitionSizes>> TypeDefinitionsSizes;
 
     [NativeInteger]
-    [VersionCondition(GreaterThanOrEqual = "19.0")]
+    [VersionCondition(GreaterThanOrEqual = "18.0")]
     public ulong MetadataUsagesCount;
 
-    [VersionCondition(GreaterThanOrEqual = "19.0")]
+    [VersionCondition(GreaterThanOrEqual = "18.0")]
     public Pointer<Pointer<Il2CppMetadataUsage>> MetadataUsages;
+
+    [NativeInteger]
+    [VersionCondition(GreaterThanOrEqual = "108.0")]
+    public ulong AlwaysInitMetadataUsagesCount;
+
+    [VersionCondition(GreaterThanOrEqual = "108.0")]
+    public Pointer<Pointer<Il2CppMetadataUsage>> AlwaysInitMetadataUsages;
 }

@@ -166,7 +166,7 @@ namespace Il2CppInspector
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Got exception {ex} while parsing SHT - reverting to PHT");
+                AnalysisLog.WriteLine($"Got exception {ex} while parsing SHT - reverting to PHT");
                 preferPHT = true;
                 SHT = [];
             }
@@ -177,12 +177,12 @@ namespace Il2CppInspector
             // or if the SHT has been deliberately stripped
             if (!SHT.Any())
             {
-                Console.WriteLine("ELF binary has no SHT - reverting to PHT");
+                AnalysisLog.WriteLine("ELF binary has no SHT - reverting to PHT");
                 preferPHT = true;
             }
             else if (SHT.All(s => conv.ULong(s.sh_addr) == 0ul))
             {
-                Console.WriteLine("ELF binary SHT is all-zero - reverting to PHT");
+                AnalysisLog.WriteLine("ELF binary SHT is all-zero - reverting to PHT");
                 preferPHT = true;
             }
             // Check for overlaps in sections that are memory-allocated on load
@@ -199,7 +199,7 @@ namespace Il2CppInspector
                     // If the first file offset of the first PHT is zero, assume a dumped image
                     if (PHT.Any(t => conv.ULong(t.p_vaddr) == 0ul))
                     {
-                        Console.WriteLine("ELF binary appears to be a dumped memory image");
+                        AnalysisLog.WriteLine("ELF binary appears to be a dumped memory image");
                         isMemoryImage = true;
                     }
                     preferPHT = true;
@@ -210,7 +210,7 @@ namespace Il2CppInspector
                     var shtOverlap = shtShouldBeOrdered.Aggregate((x, y) => x <= y ? y : ulong.MaxValue) == ulong.MaxValue;
                     if (shtOverlap)
                     {
-                        Console.WriteLine("ELF binary SHT contains invalid ranges - reverting to PHT");
+                        AnalysisLog.WriteLine("ELF binary SHT contains invalid ranges - reverting to PHT");
                         preferPHT = true;
                     }
                 }

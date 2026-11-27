@@ -23,10 +23,19 @@ public partial record struct Il2CppMetadataUsage
     {
         if (version >= MetadataVersions.V270)
         {
+            // Unity 6000.6 removes kIl2CppMetadataUsageIl2CppType and shifts the following usage kinds down by one.
+            if (version >= MetadataVersions.V1080)
+            {
+                var type = encodedValue >> 29;
+                if (type is >= 2 and <= 6)
+                    encodedValue += 1u << 29;
+                else if (type == 7)
+                    encodedValue = 0;
+            }
             return new Il2CppMetadataUsage { EncodedValue = encodedValue };
         }
 
-        if (version >= MetadataVersions.V190)
+        if (version >= MetadataVersions.V180)
         {
             // Below v27 we need to fake the 'inflated' flag, so shift the value by one
 

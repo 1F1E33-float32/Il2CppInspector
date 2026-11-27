@@ -34,10 +34,10 @@ public partial record struct Il2CppCodeRegistration
     public Pointer<Il2CppMethodPointer> MarshalingFunctions;
 
     [NativeInteger]
-    [VersionCondition(GreaterThanOrEqual = "21.0", LessThanOrEqual = "22.0")]
+    [VersionCondition(GreaterThanOrEqual = "20.1", LessThanOrEqual = "22.0")]
     public uint CcwMarshalingFunctionsCount;
 
-    [VersionCondition(GreaterThanOrEqual = "21.0", LessThanOrEqual = "22.0")]
+    [VersionCondition(GreaterThanOrEqual = "20.1", LessThanOrEqual = "22.0")]
     public Pointer<Il2CppMethodPointer> CcwMarshalingFunctions;
 
     [NativeInteger]
@@ -76,18 +76,18 @@ public partial record struct Il2CppCodeRegistration
 
     [NativeInteger]
     [VersionCondition(EqualTo = "29.0", IncludingTag = "2022"), VersionCondition(EqualTo = "31.0", IncludingTag = "2022")]
-    [VersionCondition(GreaterThanOrEqual = "35.0")]
+    [VersionCondition(GreaterThanOrEqual = "39.0")]
     public uint UnresolvedIndirectCallCount; // UnresolvedVirtualCallCount pre 29.1
 
     [VersionCondition(GreaterThanOrEqual = "22.0")]
     public Pointer<Il2CppMethodPointer> UnresolvedVirtualCallPointers;
 
     [VersionCondition(EqualTo = "29.0", IncludingTag = "2022"), VersionCondition(EqualTo = "31.0", IncludingTag = "2022")]
-    [VersionCondition(GreaterThanOrEqual = "35.0")]
+    [VersionCondition(GreaterThanOrEqual = "39.0")]
     public Pointer<Il2CppMethodPointer> UnresolvedInstanceCallWrappers;
 
     [VersionCondition(EqualTo = "29.0", IncludingTag = "2022"), VersionCondition(EqualTo = "31.0", IncludingTag = "2022")]
-    [VersionCondition(GreaterThanOrEqual = "35.0")]
+    [VersionCondition(GreaterThanOrEqual = "39.0")]
     public Pointer<Il2CppMethodPointer> UnresolvedStaticCallPointers;
 
     [NativeInteger]
@@ -98,9 +98,11 @@ public partial record struct Il2CppCodeRegistration
     public Pointer<Il2CppInteropData> InteropData;
 
     [NativeInteger]
+    [VersionCondition(EqualTo = "24.1", IncludingTag = "2018")]
     [VersionCondition(GreaterThanOrEqual = "24.3")]
     public uint WindowsRuntimeFactoryCount;
 
+    [VersionCondition(EqualTo = "24.1", IncludingTag = "2018")]
     [VersionCondition(GreaterThanOrEqual = "24.3")]
     public Pointer<Il2CppWindowsRuntimeFactoryTableEntry> WindowsRuntimeFactoryTable;
 

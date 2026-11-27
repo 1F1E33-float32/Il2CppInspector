@@ -207,7 +207,7 @@ namespace Il2CppInspector
                 // TODO: Implement Mach-O relocations
                 if (rels.Length > 0)
                 {
-                    Console.WriteLine("Mach-O file contains relocations (feature not yet implemented)");
+                    AnalysisLog.WriteLine("Mach-O file contains relocations (feature not yet implemented)");
                     break;
                 }
             }
@@ -307,7 +307,7 @@ namespace Il2CppInspector
 
                 if (type == SymbolType.Unknown)
                 {
-                    Console.WriteLine($"Unknown symbol type: {((int)ntype):x2}   {value:x16}   {name}");
+                    AnalysisLog.WriteLine($"Unknown symbol type: {((int)ntype):x2}   {value:x16}   {name}");
                 }
 
                 // Ignore duplicates
@@ -328,7 +328,7 @@ namespace Il2CppInspector
             var chainedFixupsHeader = ReadVersionedObject<MachODyldChainedFixupsHeader>(info.Offset);
             if (chainedFixupsHeader.FixupsVersion != 0)
             {
-                Console.WriteLine($"Unsupported chained fixups version: {chainedFixupsHeader.FixupsVersion}");
+                AnalysisLog.WriteLine($"Unsupported chained fixups version: {chainedFixupsHeader.FixupsVersion}");
                 return;
             }
 
@@ -339,7 +339,7 @@ namespace Il2CppInspector
                 && importsFormat != MachODyldChainedImportFormat.DYLD_CHAINED_IMPORT_ADDEND64
             )
             {
-                Console.WriteLine($"Unsupported chained fixups import format: {chainedFixupsHeader.ImportsFormat}");
+                AnalysisLog.WriteLine($"Unsupported chained fixups import format: {chainedFixupsHeader.ImportsFormat}");
                 // Rebase chains can still be processed even if bind import entries are in an unknown format.
             }
 

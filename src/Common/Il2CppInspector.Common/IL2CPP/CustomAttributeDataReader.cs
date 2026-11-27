@@ -52,7 +52,7 @@ namespace Il2CppInspector
 
                 var ctorIndex = _data.ReadUInt32();
                 ctors[i].Ctor =
-                    _assembly.Model.Package.Version >= MetadataVersions.V1040
+                    _assembly.Model.Package.Version >= MetadataVersions.V1060
                         ? _assembly.Model.GetMetadataUsageMethod(MetadataUsage.FromEncodedIndex(_assembly.Model.Package, ctorIndex))
                         : _assembly.Model.MethodsByDefinitionIndex[ctorIndex];
             }
@@ -159,7 +159,7 @@ namespace Il2CppInspector
 
             var typeDefIndex = _data.ReadCompressedUInt32();
             var typeInfo =
-                _assembly.Model.Package.Version >= MetadataVersions.V1040
+                _assembly.Model.Package.Version >= MetadataVersions.V1060
                     ? _assembly.Model.TypesByReferenceIndex[typeDefIndex]
                     : _assembly.Model.TypesByDefinitionIndex[typeDefIndex];
 

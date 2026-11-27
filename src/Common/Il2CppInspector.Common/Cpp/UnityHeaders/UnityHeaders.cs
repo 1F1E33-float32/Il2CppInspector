@@ -52,17 +52,6 @@ namespace Il2CppInspector.Cpp.UnityHeaders
             if (transformTypes != null)
                 return transformTypes(str);
 
-            // Versions 5.3.6-5.4.6 don't include a definition for VirtualInvokeData
-            if (VersionRange.Min.CompareTo("5.3.6") >= 0 && VersionRange.Max?.CompareTo("5.4.6") <= 0)
-            {
-                str =
-                    str
-                    + @"struct VirtualInvokeData
-{
-    Il2CppMethodPointer methodPtr;
-    const MethodInfo* method;
-};";
-            }
             return str;
         }
 
@@ -84,15 +73,12 @@ namespace Il2CppInspector.Cpp.UnityHeaders
             public UnityVersionRange VersionRange { get; }
 
             // Get the text of this resource
-            public string GetText() => ResourceHelper.GetText(Name);
+            public string GetText() => ResourceHelper.GetText(typeof(UnityHeaders).Assembly, Name);
 
             public UnityResource(string name)
             {
                 Name = name;
                 VersionRange = UnityVersionRange.FromFilename(name);
-                // Unity 6 snapshots remain candidates until a newer applicable snapshot is selected.
-                if (VersionRange.Min.Major >= 6000 && VersionRange.Min == VersionRange.Max)
-                    VersionRange = new UnityVersionRange(VersionRange.Min, null);
             }
 
             public override string ToString() => Name + " for " + VersionRange;
@@ -118,11 +104,26 @@ namespace Il2CppInspector.Cpp.UnityHeaders
         public static UnityHeaders ForPlugin(UnityVersion baseVersion, UnityVersion runtimeVersion, Func<string, string> transformTypes) =>
             new(GetTypeHeaderForVersion(baseVersion), GetAPIHeaderForVersion(baseVersion), transformTypes, runtimeVersion);
 
-        public static UnityResource GetTypeHeaderForVersion(UnityVersion version) =>
-            GetAllTypeHeaders().Where(r => r.VersionRange.Contains(version)).OrderByDescending(r => r.VersionRange.Min).First();
+        public static UnityResource GetTypeHeaderForVersion(UnityVersion version) => GetHeaderForVersion(GetAllTypeHeaders(), version, "type");
 
         // Get the API header file which supports the given version of Unity
-        public static UnityResource GetAPIHeaderForVersion(UnityVersion version) => GetAllAPIHeaders().First(r => r.VersionRange.Contains(version));
+        public static UnityResource GetAPIHeaderForVersion(UnityVersion version) => GetHeaderForVersion(GetAllAPIHeaders(), version, "API");
+
+        private static UnityResource GetHeaderForVersion(IEnumerable<UnityResource> resources, UnityVersion version, string kind)
+        {
+            if (
+                version.BuildType
+                is UnityVersion.BuildTypeEnum.Alpha
+                    or UnityVersion.BuildTypeEnum.Beta
+                    or UnityVersion.BuildTypeEnum.ReleaseCandidate
+            )
+                throw new NotSupportedException($"Unity {version} is a prerelease; only final (f) and patch (p) releases are supported.");
+
+            // A suffix-less command-line version denotes the first final release.
+            var exactVersion = version.BuildType == UnityVersion.BuildTypeEnum.Unspecified ? new UnityVersion($"{version}f1") : version;
+            return resources.SingleOrDefault(r => r.VersionRange.Contains(exactVersion))
+                ?? throw new NotSupportedException($"No verified IL2CPP {kind} headers are available for Unity {version}.");
+        }
 
         // Guess which header file(s) correspond to the given metadata+binary.
         // Note that this may match multiple headers due to structural changes between versions
@@ -136,10 +137,12 @@ namespace Il2CppInspector.Cpp.UnityHeaders
 
                 if (metadataVersion != binary.Image.Version)
                     continue;
+                if (metadataVersion.HasTag(MetadataVersions.Tag2022) != binary.Image.Version.HasTag(MetadataVersions.Tag2022))
+                    continue;
                 if (metadataVersion == MetadataVersions.V210)
                 {
                     /* Special version logic for metadata version 21 based on the Il2CppMetadataRegistration.fieldOffsets field */
-                    var headerFieldOffsetsArePointers = r.VersionRange.Min.CompareTo("5.3.7") >= 0 && r.VersionRange.Min.CompareTo("5.4.0") != 0;
+                    var headerFieldOffsetsArePointers = Regex.IsMatch(r.GetText(), @"\bint32_t\s*\*\s*\*\s*fieldOffsets\b");
                     var binaryFieldOffsetsArePointers = binary.FieldOffsets == null;
                     if (headerFieldOffsetsArePointers != binaryFieldOffsetsArePointers)
                         continue;
@@ -150,10 +153,12 @@ namespace Il2CppInspector.Cpp.UnityHeaders
             // Get total range of selected headers
             // Sort is needed because 5.x.x comes before 20xx.x.x in the resource list
             typeHeaders = typeHeaders.OrderBy(x => x.VersionRange).ToList();
+            if (typeHeaders.Count == 0)
+                throw new NotSupportedException($"No IL2CPP type headers are available for binary metadata version {binary.Image.Version}.");
             var totalRange = new UnityVersionRange(typeHeaders.First().VersionRange.Min, typeHeaders.Last().VersionRange.Max);
 
             // Get all API versions in this range
-            var apis = GetAllAPIHeaders().Where(a => a.VersionRange.Intersect(totalRange) != null).ToList();
+            var apis = GetAllAPIHeaders().Where(a => a.VersionRange.Intersect(totalRange) != null).OrderBy(a => a.VersionRange).ToList();
 
             // Get the API exports for the binary
             var exports = binary.APIExports;
@@ -162,9 +167,9 @@ namespace Il2CppInspector.Cpp.UnityHeaders
             // The API version may be incorrect but should be a subset of the real API and won't cause C++ compile errors
             if (!exports.Any())
             {
-                Console.WriteLine("No IL2CPP API exports found in binary - IL2CPP APIs will be unavailable in C++ project");
+                AnalysisLog.WriteLine("No IL2CPP API exports found in binary - IL2CPP APIs will be unavailable in C++ project");
 
-                return typeHeaders.Select(t => new UnityHeaders(t, apis.Last(a => a.VersionRange.Intersect(t.VersionRange) != null))).ToList();
+                return typeHeaders.Select(t => new UnityHeaders(t, apis.First(a => a.VersionRange.Intersect(t.VersionRange) != null))).ToList();
             }
 
             // Go through all of the possible API versions and see how closely they match the binary
@@ -185,7 +190,7 @@ namespace Il2CppInspector.Cpp.UnityHeaders
             if (apiMatches.Any())
             {
                 // Intersect all API ranges with all header ranges to produce final list of possible ranges
-                Console.WriteLine("IL2CPP API discovery was successful");
+                AnalysisLog.WriteLine("IL2CPP API discovery was successful");
 
                 return typeHeaders
                     .SelectMany(t => apiMatches.Where(a => t.VersionRange.Intersect(a.VersionRange) != null).Select(a => new UnityHeaders(t, a)))
@@ -194,9 +199,9 @@ namespace Il2CppInspector.Cpp.UnityHeaders
 
             // None of the possible API versions match the binary
             // Select the oldest API version from the group - C++ project compilation will fail
-            Console.WriteLine("No exact match for IL2CPP APIs found in binary - IL2CPP API availability in C++ project will be partial");
+            AnalysisLog.WriteLine("No exact match for IL2CPP APIs found in binary - IL2CPP API availability in C++ project will be partial");
 
-            return typeHeaders.Select(t => new UnityHeaders(t, apis.Last(a => a.VersionRange.Intersect(t.VersionRange) != null))).ToList();
+            return typeHeaders.Select(t => new UnityHeaders(t, apis.First(a => a.VersionRange.Intersect(t.VersionRange) != null))).ToList();
         }
 
         // Convert il2cpp-api-functions.h from "DO_API(r, n, p)" to "typedef r (*n)(p)"
@@ -221,8 +226,15 @@ namespace Il2CppInspector.Cpp.UnityHeaders
         }
 
         // Get the metadata version from a type header resource name
-        private static StructVersion GetMetadataVersionFromFilename(string resourceName) =>
-            resourceName[(typeof(UnityHeaders).Namespace!.Length + 1)..].Split('-')[0];
+        private static StructVersion GetMetadataVersionFromFilename(string resourceName)
+        {
+            StructVersion version = resourceName[(typeof(UnityHeaders).Namespace.Length + 1)..].Split('-')[0];
+            var unity = UnityVersionRange.FromFilename(resourceName).Min;
+            if (version == MetadataVersions.V241 && unity.CompareTo("2018.4.18f1") >= 0 && unity.CompareTo("2019.0.0") < 0)
+                return new(24, 1, MetadataVersions.Tag2018);
+            // 29.1/31.1 identify the Unity 2022 registration layout; the metadata file still says 29/31.
+            return version.Major is 29 or 31 && version.Minor == 1 ? new(version.Major, 0, MetadataVersions.Tag2022) : version;
+        }
 
         // Equality comparisons
         public static bool operator ==(UnityHeaders first, UnityHeaders second)

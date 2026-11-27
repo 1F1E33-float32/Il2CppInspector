@@ -248,17 +248,19 @@ namespace Il2CppInspector
             }
 
             // Find MetadataRegistration
-            // >= 19
+            // >= 18
             var metadataRegistration = 0ul;
 
-            // Find TypeDefinitionsSizesCount (4th last field) then work back to the start of the struct
+            // TypeDefinitionsSizesCount has four trailing words, or six with Unity 6000.6's always-init usage table.
             // This saves us from guessing where metadataUsagesCount is later
             var mrSize = (ulong)Il2CppMetadataRegistration.StructSize(Image.Version, readerConfig);
             var typesLength = (ulong)metadata.Types.Length;
 
-            vas = FindAllMappedWords(imageBytes, typesLength).Select(a => a - mrSize + ptrSize * 4);
+            var trailingWords = Image.Version >= MetadataVersions.V1080 ? 6u : 4u;
+            var typeCountOffset = mrSize - ptrSize * trailingWords;
+            vas = FindAllMappedWords(imageBytes, typesLength).Where(a => a >= typeCountOffset).Select(a => a - typeCountOffset);
 
-            // >= 19
+            // >= 18
             // Luke: Previously, a check comparing MetadataUsagesCount was used here,
             // but I know of at least one binary where this will break detection.
             // Testing showed that we can just use the same heuristic used for v27+
@@ -271,7 +273,7 @@ namespace Il2CppInspector
             // As of v27 metadata usages are no longer set in the metareg, so the count should always be zero.
             // TODO: Mapping ELF binaries at a higher base address will hopefully reduce erroneous detections.
 
-            if (Image.Version >= MetadataVersions.V190)
+            if (Image.Version >= MetadataVersions.V180)
             {
                 foreach (var va in vas)
                 {
@@ -281,7 +283,7 @@ namespace Il2CppInspector
                         && mr.FieldOffsetsCount == metadata.Types.Length
                         && mr is { GenericInstsCount: > 0, GenericClassesCount: > 0 }
                         && Image.TryMapVATR(mr.FieldOffsets, out _)
-                        && (Image.Version < MetadataVersions.V270 || mr.MetadataUsagesCount == 0)
+                        && (Image.Version < MetadataVersions.V270 || Image.Version >= MetadataVersions.V1080 || mr.MetadataUsagesCount == 0)
                     )
                     {
                         metadataRegistration = va;

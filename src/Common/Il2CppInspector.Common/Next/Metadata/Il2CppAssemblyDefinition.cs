@@ -21,7 +21,7 @@ public partial record struct Il2CppAssemblyDefinition
     public uint Token;
 
     [FieldOffset(20 + 52)]
-    [VersionCondition(GreaterThanOrEqual = "38.0")]
+    [VersionCondition(GreaterThanOrEqual = "39.0")]
     public uint ModuleToken;
 
     [FieldOffset(8)]

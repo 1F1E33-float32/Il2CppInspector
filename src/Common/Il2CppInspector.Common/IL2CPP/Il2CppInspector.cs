@@ -100,15 +100,15 @@ namespace Il2CppInspector
             if (Metadata.HasGameAdapter)
                 return Metadata.GameAdapter.Usages;
 
-            // No metadata usages for versions < 19
-            if (Version < MetadataVersions.V190)
+            // Metadata usages were introduced in Unity 5.3.1p1 (version 18).
+            if (Version < MetadataVersions.V180)
                 return null;
 
             // Metadata usages are lazily initialized during runtime for versions >= 27
             if (Version >= MetadataVersions.V270)
                 return buildLateBindingMetadataUsages();
 
-            // Version >= 19 && < 27
+            // Version >= 18 && < 27
             var usages = new Dictionary<uint, uint>();
             foreach (var metadataUsageList in Metadata.MetadataUsageLists)
             {
@@ -122,6 +122,8 @@ namespace Il2CppInspector
             // Metadata usages (addresses)
             // Unfortunately the value supplied in MetadataRegistration.matadataUsagesCount seems to be incorrect,
             // so we have to calculate the correct number of usages above before reading the usage address list from the binary
+            if (usages.Count == 0)
+                return [];
             var count = usages.Keys.Max() + 1;
             var addresses = Binary.Image.ReadMappedUWordArray(Binary.MetadataRegistration.MetadataUsages, (int)count);
 
@@ -296,7 +298,7 @@ namespace Il2CppInspector
                 }
             }
 
-            if (Version >= MetadataVersions.V1040)
+            if (Version >= MetadataVersions.V1060)
             {
                 TypeInlineArrays = Metadata.TypeInlineArrays.ToDictionary(x => x.TypeIndex, x => x.Length);
             }
@@ -396,6 +398,7 @@ namespace Il2CppInspector
         )
         {
             var explicitPlugin = loadOptions?.Game == null ? null : Plugins.GamePlugins.Get(loadOptions.Game);
+            loadOptions?.CancellationToken.ThrowIfCancellationRequested();
             using Stream binary =
                 explicitPlugin != null && !explicitPlugin.RequiredInputs.HasFlag(Plugins.GamePluginInputs.Binary)
                     ? new MemoryStream()
@@ -433,8 +436,7 @@ namespace Il2CppInspector
             }
         }
 
-        // Load from a binary stream and metadata stream
-        // Must be a seekable stream otherwise we catch a System.IO.NotSupportedException
+        // Load from a binary stream and metadata stream (must be a seekable stream)
         public static List<Il2CppInspector> LoadFromStream(
             Stream binaryStream,
             MemoryStream metadataStream,
@@ -455,91 +457,36 @@ namespace Il2CppInspector
             bool pluginResolved = false
         )
         {
-            // Silent operation if requested
-            var stdout = Console.Out;
-            if (silent)
-                Console.SetOut(new StreamWriter(Stream.Null));
-
+            using var log = silent ? new AnalysisLog(null) : null;
+            loadOptions?.CancellationToken.ThrowIfCancellationRequested();
             var metadataData = metadataStream.ToArray();
             if (!pluginResolved)
             {
-                try
-                {
-                    selectedPlugin =
-                        loadOptions?.Game == null
-                            ? Plugins.GamePlugins.Select(null, [], binaryStream) ?? Plugins.GamePlugins.Select(null, metadataData, binaryStream)
-                            : Plugins.GamePlugins.Select(loadOptions.Game, metadataData, binaryStream);
-                }
-                catch (Exception ex)
-                {
-                    Console.Error.WriteLine(ex.Message);
-                    Console.SetOut(stdout);
-                    return null;
-                }
+                selectedPlugin =
+                    loadOptions?.Game == null
+                        ? Plugins.GamePlugins.Select(null, [], binaryStream) ?? Plugins.GamePlugins.Select(null, metadataData, binaryStream)
+                        : Plugins.GamePlugins.Select(loadOptions.Game, metadataData, binaryStream);
             }
             if (selectedPlugin != null)
             {
-                try
-                {
-                    return
-                    [
-                        selectedPlugin.Load(
-                            binaryStream,
-                            selectedPlugin.RequiredInputs.HasFlag(Plugins.GamePluginInputs.Metadata) ? metadataData : [],
-                            selectedPlugin.RequiredInputs.HasFlag(Plugins.GamePluginInputs.StartupMetadata) ? startupMetadataStream?.ToArray() : null,
-                            loadOptions,
-                            statusCallback
-                        ),
-                    ];
-                }
-                catch (Exception ex)
-                {
-                    Console.Error.WriteLine(ex.Message);
-                    return null;
-                }
-                finally
-                {
-                    Console.SetOut(stdout);
-                }
+                return
+                [
+                    selectedPlugin.Load(
+                        binaryStream,
+                        selectedPlugin.RequiredInputs.HasFlag(Plugins.GamePluginInputs.Metadata) ? metadataData : [],
+                        selectedPlugin.RequiredInputs.HasFlag(Plugins.GamePluginInputs.StartupMetadata) ? startupMetadataStream?.ToArray() : null,
+                        loadOptions,
+                        statusCallback
+                    ),
+                ];
             }
 
-            // Load the metadata file
-            Metadata metadata;
-            try
-            {
-                metadata = Metadata.FromStream(metadataStream, statusCallback);
-            }
-            catch (Exception ex)
-            {
-                Console.Error.WriteLine(ex.Message);
-                Console.SetOut(stdout);
-                return null;
-            }
-
-            Console.WriteLine("Detected metadata version " + metadata.Version);
-
-            // Load the il2cpp code file (try all available file formats)
-            IFileFormatStream stream;
-            try
-            {
-                stream = FileFormatStream.Load(binaryStream, loadOptions, statusCallback);
-
-                if (stream == null)
-                    throw new InvalidOperationException("Unsupported executable file format");
-            }
-            catch (Exception ex)
-            {
-                Console.Error.WriteLine(ex.Message);
-                Console.SetOut(stdout);
-                return null;
-            }
-
-            // Multi-image binaries may contain more than one Il2Cpp image
-            var inspectors = LoadFromStream(stream, metadata, statusCallback);
-
-            Console.SetOut(stdout);
-
-            return inspectors;
+            var metadata = Metadata.FromStream(metadataStream, statusCallback);
+            AnalysisLog.WriteLine("Detected metadata version " + metadata.Version);
+            var stream =
+                FileFormatStream.Load(binaryStream, loadOptions, statusCallback)
+                ?? throw new NotSupportedException("Unsupported executable file format.");
+            return LoadFromStream(stream, metadata, statusCallback);
         }
 
         public static List<Il2CppInspector> LoadFromStream(IFileFormatStream stream, Metadata metadata, EventHandler<string> statusCallback = null)
@@ -547,31 +494,16 @@ namespace Il2CppInspector
             var processors = new List<Il2CppInspector>();
             foreach (var image in stream.Images)
             {
-                Console.WriteLine("Container format: " + image.Format);
-                Console.WriteLine("Container endianness: " + ((BinaryObjectStream)image).Endianness);
-                Console.WriteLine("Architecture word size: {0}-bit", image.Bits);
-                Console.WriteLine("Instruction set: " + image.Arch);
-                Console.WriteLine("Global offset: 0x{0:X16}", image.GlobalOffset);
-
-                // Architecture-agnostic load attempt
-                try
-                {
-                    if (Il2CppBinary.Load(image, metadata, statusCallback) is Il2CppBinary binary)
-                    {
-                        Console.WriteLine("IL2CPP binary version " + image.Version);
-
-                        processors.Add(new Il2CppInspector(binary, metadata));
-                    }
-                    else
-                    {
-                        Console.Error.WriteLine("Could not process IL2CPP image.");
-                    }
-                }
-                // Unknown architecture
-                catch (NotImplementedException ex)
-                {
-                    Console.Error.WriteLine(ex.Message);
-                }
+                AnalysisLog.WriteLine("Container format: " + image.Format);
+                AnalysisLog.WriteLine("Container endianness: " + ((BinaryObjectStream)image).Endianness);
+                AnalysisLog.WriteLine($"Architecture word size: {image.Bits}-bit");
+                AnalysisLog.WriteLine("Instruction set: " + image.Arch);
+                AnalysisLog.WriteLine($"Global offset: 0x{image.GlobalOffset:X16}");
+                var binary =
+                    Il2CppBinary.Load(image, metadata, statusCallback)
+                    ?? throw new InvalidDataException($"Could not process IL2CPP image ({image.Format}, {image.Arch}).");
+                AnalysisLog.WriteLine("IL2CPP binary version " + image.Version);
+                processors.Add(new Il2CppInspector(binary, metadata));
             }
             return processors;
         }

@@ -29,6 +29,7 @@ internal static class NativeDebugGlobals
         // Enumerate every cache slot, not AppType/AppMethod's single retained address.
         foreach (var usage in model.Package.MetadataUsages ?? [])
         {
+            AnalysisLog.CheckCancellation();
             switch (usage.Type)
             {
                 case MetadataUsageType.TypeInfo:
