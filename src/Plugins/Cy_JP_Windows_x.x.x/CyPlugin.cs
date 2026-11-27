@@ -1,3 +1,4 @@
+using System.Buffers.Binary;
 using Il2CppInspector.Plugins;
 
 namespace Il2CppInspector.Plugin.Cy;
@@ -29,7 +30,17 @@ public sealed class CyPlugin : GamePlugin
         try
         {
             status?.Invoke(this, "Recovering Cy embedded metadata");
-            using var stream = new MemoryStream(CyMetadata.Recover(image, options));
+            var (data, address) = CyMetadata.Recover(image, options);
+            status?.Invoke(this, "Detecting Cy metadata version");
+            var versions = DetectMetadataVersions((Stream)image, data, options);
+            if (versions.Length == 0)
+                throw new InvalidDataException("No supported metadata version matches the recovered Cy metadata and GameAssembly.dll.");
+            if (versions.Length != 1)
+                throw new NotSupportedException($"Cy metadata version is ambiguous; matching versions: {string.Join(", ", versions)}.");
+            BinaryPrimitives.WriteInt32LittleEndian(data.AsSpan(4), versions[0]);
+            image.Write(image.MapVATR(address) + 4, versions[0]);
+            status?.Invoke(this, $"Detected Cy metadata version {versions[0]}");
+            using var stream = new MemoryStream(data);
             var decoded = Metadata.FromStream(stream, status);
             try
             {

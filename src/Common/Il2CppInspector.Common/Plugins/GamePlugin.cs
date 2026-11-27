@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Il2CppInspector.Cpp.UnityHeaders;
 using Il2CppInspector.Model;
 using Il2CppInspector.Reflection;
@@ -24,6 +25,16 @@ namespace Il2CppInspector.Plugins
         public virtual UnityVersion DefaultUnityVersion => null;
         public virtual string PythonMetadataProcessor => "";
         public virtual string RegistrationSignature => null;
+
+        /// <summary>
+        /// Detects final/patch metadata header versions using a normalized metadata file and its binary.
+        /// Ignores the existing version word, preserves both inputs and the binary stream position, and returns
+        /// all validated candidates in ascending order. An empty result means no supported layout matched;
+        /// multiple results (such as 106 and 107) require the plugin to resolve the ambiguity.
+        /// This opt-in operation is never used by normal plugin selection or stock loading.
+        /// </summary>
+        protected static ImmutableArray<int> DetectMetadataVersions(Stream binary, ReadOnlySpan<byte> metadata, LoadOptions options = null) =>
+            MetadataVersionDetector.Detect(binary, metadata, options);
 
         public abstract bool Matches(ReadOnlySpan<byte> metadata);
 

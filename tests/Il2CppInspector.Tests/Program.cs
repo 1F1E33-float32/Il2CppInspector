@@ -17,6 +17,12 @@ namespace Il2CppInspector.Tests
                 case "--cpp-layout":
                     Common.Cpp.CppTypeTests.Run(Optional(args, 1));
                     break;
+                case "--unity-headers":
+                    Common.Cpp.UnityHeadersTests.Run(Optional(args, 1));
+                    break;
+                case "--metadata-version":
+                    Common.IL2CPP.MetadataVersionDetectionTests.Run();
+                    break;
                 case "--progress":
                     ProgressBarTests.Run(args);
                     break;
@@ -44,7 +50,7 @@ namespace Il2CppInspector.Tests
                 default:
                     throw new ArgumentException(
                         "Usage: dotnet run --project tests/Il2CppInspector.Tests -c Release -- <mode> [arguments]; "
-                            + "modes: --plugins, --serialization, --cpp-layout, --progress, --cli-targets, --plugin-cli, --stock, "
+                            + "modes: --plugins, --serialization, --cpp-layout, --unity-headers, --metadata-version, --progress, --cli-targets, --plugin-cli, --stock, "
                             + "--pdb-fixture, --dwarf-fixture, --dwarf-globals, --game. See README.md for arguments."
                     );
             }

@@ -105,7 +105,7 @@ internal static class CyMetadata
         return [.. constructors.Distinct()];
     }
 
-    internal static byte[] Recover(IFileFormatStream image, LoadOptions options)
+    internal static (byte[] Data, ulong Address) Recover(IFileFormatStream image, LoadOptions options)
     {
         if (image.Arch != "x64")
             throw new NotSupportedException("Cy embedded metadata requires a Windows x64 image.");
@@ -163,45 +163,57 @@ internal static class CyMetadata
             byte[] header = new byte[16];
             emulator.MemRead((long)pointer, header);
             int headerSize = BinaryPrimitives.ReadInt32LittleEndian(header.AsSpan(8));
-            if (headerSize != 0x100)
+            if (headerSize < 16 || headerSize > 4096 || headerSize % 4 != 0)
                 throw new InvalidDataException($"Cy metadata at 0x{pointer:X} has invalid header size {headerSize}.");
             header = new byte[headerSize];
             emulator.MemRead((long)pointer, header);
-            int length = headerSize;
-            for (int offset = 8; offset < headerSize; offset += 8)
+            // Stock headers use offset/size pairs or offset/size/count triples. Keep every bounded interpretation
+            // until the plugin can identify the version against the recovered binary; the version word is not evidence.
+            var length = 0;
+            foreach (var stride in new[] { 8, 12 })
             {
-                int start = BinaryPrimitives.ReadInt32LittleEndian(header.AsSpan(offset));
-                int size = BinaryPrimitives.ReadInt32LittleEndian(header.AsSpan(offset + 4));
-                if (start < 0 || size < 0 || start > MaximumMetadataSize - size)
-                    throw new InvalidDataException($"Cy metadata section at header offset 0x{offset:X} has invalid range {start}+{size}.");
-                length = Math.Max(length, start + size);
-            }
-            if (
-                !sections.Any(section =>
-                    pointer >= section.VirtualStart && pointer <= section.VirtualEnd && (ulong)length <= section.VirtualEnd - pointer + 1
+                if ((headerSize - 8) % stride != 0)
+                    continue;
+                var end = headerSize;
+                for (var offset = 8; offset < headerSize; offset += stride)
+                {
+                    int start = BinaryPrimitives.ReadInt32LittleEndian(header.AsSpan(offset));
+                    int size = BinaryPrimitives.ReadInt32LittleEndian(header.AsSpan(offset + 4));
+                    if (start < 0 || size < 0 || start > MaximumMetadataSize - size || (size != 0 && start < headerSize))
+                    {
+                        end = 0;
+                        break;
+                    }
+                    if (stride == 12)
+                    {
+                        int count = BinaryPrimitives.ReadInt32LittleEndian(header.AsSpan(offset + 8));
+                        if (count < 0 || count > size || (count == 0) != (size == 0))
+                        {
+                            end = 0;
+                            break;
+                        }
+                    }
+                    end = Math.Max(end, start + size);
+                }
+                if (
+                    end > 0
+                    && sections.Any(section =>
+                        pointer >= section.VirtualStart && pointer <= section.VirtualEnd && (ulong)end <= section.VirtualEnd - pointer + 1
+                    )
                 )
-            )
-                throw new InvalidDataException($"Cy metadata range 0x{pointer:X}+0x{length:X} exceeds its PE section.");
+                    length = Math.Max(length, end);
+            }
+            if (length == 0)
+                throw new InvalidDataException($"Cy metadata at 0x{pointer:X} has no valid section ranges within its PE section.");
             byte[] decoded = new byte[length];
             emulator.MemRead((long)pointer, decoded);
-            // MetadataCache ignores the first two header words. Method records retain the return-parameter token at +0xC and stride 0x24.
-            int methodsOffset = BinaryPrimitives.ReadInt32LittleEndian(decoded.AsSpan(0x30));
-            int methodsSize = BinaryPrimitives.ReadInt32LittleEndian(decoded.AsSpan(0x34));
-            if (methodsSize == 0 || methodsSize % 36 != 0)
-                throw new NotSupportedException("Cy metadata does not use the supported method definition layout.");
-            for (int offset = methodsOffset; offset < methodsOffset + methodsSize; offset += 36)
-            {
-                options?.CancellationToken.ThrowIfCancellationRequested();
-                if ((BinaryPrimitives.ReadUInt32LittleEndian(decoded.AsSpan(offset + 24)) >> 24) != 6)
-                    throw new InvalidDataException($"Cy metadata method at offset 0x{offset:X} has an invalid method token.");
-            }
+            // MetadataCache ignores the first two header words. Restore the signature; the plugin probes the version separately.
             BinaryPrimitives.WriteUInt32LittleEndian(decoded, 0xFAB11BAF);
-            BinaryPrimitives.WriteInt32LittleEndian(decoded.AsSpan(4), 31);
             // Preserve the constructor's global result for callers reading the binary's native metadata pointers.
             image.Write(image.MapVATR(pointer), decoded);
             image.Write(image.MapVATR(global), BitConverter.GetBytes(pointer));
             options?.ProgressCallback?.Invoke(new("Read Cy metadata", 1, 1));
-            return decoded;
+            return (decoded, pointer);
         }
         catch (UnicornEngineException error)
         {
